@@ -426,7 +426,8 @@ body{
 }
 .logo-login{
     background: no-repeat center center;
-    background-image: url('/assets/page1/logo.png');
+    background-image: url('/assets/page1/logoblanco.png');
+    background-size: contain;
     display: inline-block;
     width:100%;
     height:100px ;

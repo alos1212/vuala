@@ -81,7 +81,7 @@ const LoginPage: React.FC = () => {
                                 <input
                                     type="text"
                                     placeholder="tu@email.com o usuario"
-                                    className={`input w-full ${errors.email ? 'input-error' : ''
+                                    className={`input input-bordered w-full border-white/20 bg-white text-slate-900 placeholder:text-slate-400 ${errors.email ? 'input-error' : ''
                                         }`}
                                     {...register('email')}
                                     autoComplete="username"
@@ -107,7 +107,7 @@ const LoginPage: React.FC = () => {
                                     <input
                                         type={showPassword ? 'text' : 'password'}
                                         placeholder="••••••••"
-                                        className={`input input-bordered w-full pr-12 ${errors.password ? 'input-error' : ''
+                                        className={`input input-bordered w-full border-white/20 bg-white pr-12 text-slate-900 placeholder:text-slate-400 ${errors.password ? 'input-error' : ''
                                             }`}
                                         {...register('password')}
                                         autoComplete="current-password"
