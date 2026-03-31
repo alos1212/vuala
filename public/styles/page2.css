@@ -1,0 +1,409 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+/* Estilos para Booking assistance */
+ :root{
+    --color-primary: #e71867;          /* Azul */
+    --color-primary-content: #ffffff;
+
+    --color-secondary: #333;        /* Naranja */
+    --color-secondary-content: #fff;
+
+    --color-accent: #10b981;           /* Verde */
+    --color-accent-content: #ffffff;
+
+    --color-neutral: #3d4451;          /* Gris oscuro */
+    --color-neutral-content: #ffffff;
+
+    --color-base-100: #ffffff;         /* Fondo principal */
+    --color-base-200: #f5f5f5;         /* Fondo secundario */
+    --color-base-300: #e5e7eb;
+    --color-base-content: #e97922;
+}
+
+.bg-image-login{
+    background: no-repeat bottom right;
+    background-image: url('/src/assets/page1/bg-login.jpg');
+    background-size: cover;
+}
+.logo-login{
+    background: no-repeat center center;
+    background-image: url('/src/assets/page2/logov.webp');
+    display: inline-block;
+    width:100%;
+    height:100px ;
+}
+
+.logo-header{
+    background: no-repeat center center;
+    background-size: contain; 
+    background-image: url('/src/assets/page2/logov.webp');
+    display: inline-block;
+    width:200px;
+    height:60px ;
+}
+ 
+.app-shell {
+  font-family: "Space Grotesk", "Poppins", sans-serif;
+  min-height: 100vh;
+  color: var(--color-base-content);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-base-200);
+  isolation: isolate;
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(900px 520px at 8% -10%, color-mix(in srgb, var(--color-primary) 18%, transparent), transparent 60%),
+    radial-gradient(720px 420px at 92% 5%, color-mix(in srgb, var(--color-secondary) 18%, transparent), transparent 55%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-base-100) 92%, transparent) 0%, var(--color-base-200) 100%);
+  z-index: 0;
+}
+
+.app-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-body--with-sidebar {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 24px;
+}
+
+.app-main {
+  flex: 1;
+  padding: 0;
+  margin: 0;
+  min-height: 100vh;
+  overflow: visible;
+}
+
+.app-content {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px;
+  min-height: 100vh;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--color-base-100) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--color-base-300);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.app-navbar {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 10px 16px;
+}
+
+.app-menu {
+  border-radius: 18px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--color-base-100) 82%, transparent);
+  border: 1px solid var(--color-base-300);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.menu-header .active{
+  background-color: var(--color-primary);
+  color: var(--color-primary-content);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+}
+.menu-header .active svg{
+  color: var(--color-primary-content);
+}
+
+.menu-header a, .menu-header label{
+  padding: 10px 14px;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+.menu-header label:hover,
+.menu-header a:hover{
+  background: color-mix(in srgb, var(--color-secondary) 12%, transparent);
+  color: var(--color-base-content);
+}
+.menu-header ul li ul li a, .menu-header ul li ul li label{
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+.menu-header .dropdown-content{
+  border: 1px solid var(--color-base-300);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+}
+
+.app-user-menu .btn{
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-base-100) 82%, transparent);
+  border: 1px solid var(--color-base-300);
+}
+.app-user-menu .btn:hover{
+  background: var(--color-base-100);
+}
+.app-user-menu .badge-primary{
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-content);
+}
+
+.app-drawer{
+  border-radius: 18px 0 0 18px;
+  box-shadow: -10px 0 24px rgba(15, 23, 42, 0.12);
+}
+
+.app-shell .bg-base-100{
+  background-color: var(--color-base-100);
+}
+.app-shell .bg-base-200{
+  background-color: transparent;
+}
+
+.app-sidebar {
+  width: 280px;
+  padding: 0;
+  display: flex;
+  justify-content: flex-end;
+  min-height: 100vh;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  border: none;
+}
+
+.app-sidebar-panel {
+  width: 100%;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  border-radius: 0;
+  position: sticky;
+  top: 0;
+  align-self: stretch;
+}
+
+.app-sidebar-panel--open {
+  background: transparent;
+  border: none;
+}
+
+.app-drawer-panel {
+  background: color-mix(in srgb, var(--color-base-100) 92%, var(--color-primary) 8%);
+  border: 1px solid var(--color-base-300);
+}
+
+.app-accordion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.app-accordion-item {
+  color: var(--color-base-content);
+  text-align: left;
+  white-space: normal;
+  height: auto;
+  min-height: 44px;
+  align-items: center;
+}
+
+.app-accordion-item--mobile {
+}
+
+.app-accordion-item.active {
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+}
+
+.app-accordion-item.app-accordion-open {
+  background: color-mix(in srgb, var(--color-secondary) 18%, transparent);
+  color: var(--color-base-content);
+}
+
+.app-accordion-toggle {
+  cursor: pointer;
+}
+
+.app-accordion-label {
+  flex: 1;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.app-accordion-chevron {
+  transition: transform 0.2s ease;
+}
+
+.app-accordion-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.app-accordion-children {
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 1px solid var(--color-base-300);
+  gap: 8px;
+}
+
+.app-sidebar-brand {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-base-300);
+}
+
+.app-sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.app-sidebar-top {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.app-sidebar-top--mobile {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.app-sidebar-footer--mobile {
+  margin-top: 20px;
+}
+
+.app-sidebar-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--color-base-300);
+}
+
+.app-sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.app-sidebar-actions .btn {
+  justify-content: flex-start;
+}
+
+.app-menu-toggle {
+  position: fixed;
+  right: 16px;
+  top: 14px;
+  z-index: 60;
+  border: 1px solid var(--color-base-300);
+  background: color-mix(in srgb, var(--color-base-100) 90%, transparent);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+@media (max-width: 1024px) {
+  .app-main {
+    padding: 20px 18px 36px;
+  }
+
+  .app-content {
+    border-radius: 18px;
+    padding: 18px;
+  }
+
+  .app-body--with-sidebar {
+    flex-direction: column;
+  }
+
+  .app-sidebar {
+    width: 100%;
+    padding: 0;
+    min-height: auto;
+    background: transparent;
+    box-shadow: none;
+    display: flex;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-main {
+    padding: 16px 12px 24px;
+  }
+
+  .app-content {
+    padding: 16px;
+  }
+}
+/* Fondo general del calendario */
+.rdrCalendarWrapper {
+  background-color: #ffffff !important;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  width: 100%;
+}
+
+/* Colores de los días seleccionados */
+.rdrDayNumber span {
+  color: #333 !important;
+}
+
+.rdrDaySelected {
+  background-color: var(--color-primary) !important; /* Verde principal */
+  color: white !important;
+}
+
+.rdrDayInRange {
+  background-color: rgba(0, 153, 80, 0.2) !important;
+}
+
+/* Hover sobre los días */
+.rdrDay:hover {
+  background-color: rgba(0, 153, 80, 0.1) !important;
+}
+
+/* Días deshabilitados */
+.rdrDayDisabled {
+  opacity: 0.4;
+}
+
+/* Encabezado del mes (nombre del mes y año) */
+.rdrMonthName {
+  color: var(--color-primary) !important;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+/* Día actual */
+.rdrDayToday .rdrDayNumber span:after {
+  background-color: var(--color-primary) !important;
+}
+
+/* Bordes y separación entre meses */
+.rdrMonths {
+  gap: 1.5rem;
+}
