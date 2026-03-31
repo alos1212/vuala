@@ -362,10 +362,6 @@ const AgencyDetailPage: React.FC<AgencyDetailPageProps> = ({ selfMode = false })
                   <div className="text-sm text-base-content/60">Dirección</div>
                   <div className="font-semibold">{agency.address || '-'}</div>
                 </div>
-                <div>
-                  <div className="text-sm text-base-content/60">Website (compañía)</div>
-                  <div className="font-semibold">{websiteName()}</div>
-                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -386,48 +382,6 @@ const AgencyDetailPage: React.FC<AgencyDetailPageProps> = ({ selfMode = false })
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <div className="text-sm text-base-content/60">Comisión</div>
-                  <div className="font-semibold">{agency.commission ?? '-'}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-base-content/60">Cupo</div>
-                  <div className="font-semibold">{agency.credit_limit ?? '-'}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-base-content/60">Cupo especial</div>
-                  <div className="font-semibold">{(agency as any).special_credit_limit ?? '-'}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <div>
-                  <div className="text-sm text-base-content/60">Tipo de venta</div>
-                  <div className="font-semibold">{saleTypeLabel(agency.sale_type)}</div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <div className={`badge ${boolBadge(agency.is_domestic, 'Nacional').className}`}>
-                  {boolBadge(agency.is_domestic, 'Nacional').label}
-                </div>
-                <div className={`badge ${boolBadge(agency.is_international, 'Internacional').className}`}>
-                  {boolBadge(agency.is_international, 'Internacional').label}
-                </div>
-                <div className={`badge ${boolBadge(agency.allows_passengers, 'Pasajeros').className}`}>
-                  {boolBadge(agency.allows_passengers, 'Pasajeros').label}
-                </div>
-                <div className={`badge ${boolBadge(agency.allows_groups, 'Grupos').className}`}>
-                  {boolBadge(agency.allows_groups, 'Grupos').label}
-                </div>
-                <div className={`badge ${boolBadge(agency.accumulates_points, 'Acumula puntos').className}`}>
-                  {boolBadge(agency.accumulates_points, 'Acumula puntos').label}
-                </div>
-                <div className={`badge ${boolBadge(agency.profit, 'Ocultar ganancia').className}`}>
-                  {boolBadge(agency.profit, 'Ocultar ganancia').label}
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -453,20 +407,7 @@ const AgencyDetailPage: React.FC<AgencyDetailPageProps> = ({ selfMode = false })
       </div>
 
       <div className="space-y-3">
-        <div className="tabs tabs-boxed">
-          {(canListMyAgencyUsers || !isSelfRoute) && (
-            <a className={`tab ${activeTab === 'users' ? 'tab-active' : ''}`} onClick={() => setActiveTab('users')}>
-              Usuarios
-            </a>
-          )}
-          {showPlansTab && (
-            <a className={`tab ${activeTab === 'plans' ? 'tab-active' : ''}`} onClick={() => setActiveTab('plans')}>
-              Planes
-            </a>
-          )}
-        </div>
-
-        {activeTab === 'users' && (canListMyAgencyUsers || !isSelfRoute) ? (
+        {(canListMyAgencyUsers || !isSelfRoute) ? (
           <AgencyUsersTab
             users={agencyUsers}
             onCreate={openCreateUser}
@@ -479,8 +420,6 @@ const AgencyDetailPage: React.FC<AgencyDetailPageProps> = ({ selfMode = false })
             canViewProfile={canViewAgencyUserProfile}
             canDelete={canDeleteMyAgencyUsers}
           />
-        ) : showPlansTab ? (
-          <AgencyPlansTab agencyId={agency.id} defaultCommission={Number(agency.commission ?? 0)} />
         ) : (
           <div className="alert alert-warning">
             <span>No tienes permisos para ver usuarios de tu agencia.</span>

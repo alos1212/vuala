@@ -5,7 +5,6 @@ import * as yup from 'yup';
 import type { Agency } from '../../types/agency';
 import type { Country, State, City } from '../../types/zone';
 import { geoService } from '../../services/geoService';
-import { companyService } from '../../services/companyService';
 import { userService } from '../../services/userService';
 import type { User } from '../../types/auth';
 import { resolveStorageUrl } from '../../utils/authHelpers';
@@ -32,28 +31,13 @@ const schema = yup.object({
   country_id: yup.string().required('El país es obligatorio'),
   state_id: yup.string().required('El estado es obligatorio'),
   city_id: yup.string().required('La ciudad es obligatoria'),
-  commission: yup.string().required('La comisión es obligatoria'),
-  credit_limit: yup.string().required('El cupo es obligatorio'),
   color_primary: yup.string().nullable().required(),
   color_secondary: yup.string().nullable().required(),
-  sale_type: yup.number().oneOf([1, 2, 3]).required('El tipo de venta es obligatorio'),
-  accumulates_points: yup.boolean().default(false),
-  profit: yup.boolean().default(false),
-  website: yup.string().nullable(),
 });
 
 export type AgencyFormValues = yup.InferType<typeof schema> & {
   logo?: File | null;
   logo_path?: string | null;
-  is_domestic?: boolean;
-  is_international?: boolean;
-  allows_passengers?: boolean;
-  allows_groups?: boolean;
-  allows_pets?: boolean;
-  cashback?: boolean;
-  accumulates_points?: boolean;
-  profit?: boolean;
-  hotels_enabled?: boolean;
   manager_user_id?: number | null;
 };
 
@@ -62,14 +46,7 @@ interface AgencyFormProps {
   onSubmit: (data: AgencyFormValues) => void;
   isSubmitting?: boolean;
   title?: string;
-  hideEnabledServicesSection?: boolean;
 }
-
-const saleTypeOptions = [
-  { label: 'Virtual', value: 1 },
-  { label: 'Física', value: 2 },
-  { label: 'Ambas', value: 3 },
-];
 
 const taxRegimeOptions = [
   { label: 'Régimen Común', value: 'Régimen Común' },
@@ -107,7 +84,6 @@ const AgencyForm: React.FC<AgencyFormProps> = ({
   onSubmit,
   isSubmitting,
   title,
-  hideEnabledServicesSection = false,
 }) => {
   const [countries, setCountries] = useState<Country[]>([]);
   const [countriesLoaded, setCountriesLoaded] = useState(false);
@@ -116,7 +92,6 @@ const AgencyForm: React.FC<AgencyFormProps> = ({
   const initializingRef = useRef(false);
   const initialStateIdRef = useRef<string | null>(null);
   const initialCityIdRef = useRef<string | null>(null);
-  const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
   const [managers, setManagers] = useState<User[]>([]);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -140,24 +115,11 @@ const AgencyForm: React.FC<AgencyFormProps> = ({
       country_id: '',
       state_id: '',
       city_id: '',
-      commission: '',
-      credit_limit: '',
-      color_primary: '#044483',
-      color_secondary: '#cad434',
-      sale_type: 2,
-      is_domestic: true,
-      is_international: true,
-      allows_passengers: false,
-      allows_groups: false,
-      allows_pets: false,
-      accumulates_points: false,
-      cashback: false,
-      profit: false,
-      hotels_enabled: false,
+      color_primary: '#7c3aed',
+      color_secondary: '#2e1065',
       manager_user_id: undefined,
       logo: null,
       logo_path: null,
-      website: '',
     },
   });
 
@@ -251,18 +213,6 @@ const AgencyForm: React.FC<AgencyFormProps> = ({
   }, []);
 
   useEffect(() => {
-    const loadCompanies = async () => {
-      try {
-        const data = await companyService.getCompanies();
-        setCompanies(data.map((c) => ({ id: c.id, name: c.name })));
-      } catch (err) {
-        console.error('No se pudieron cargar compañías', err);
-      }
-    };
-    loadCompanies();
-  }, []);
-
-  useEffect(() => {
     const loadManagers = async () => {
       try {
         const users = await userService.getAgencyManagers();
@@ -332,29 +282,14 @@ const AgencyForm: React.FC<AgencyFormProps> = ({
         address: initialValues.address ?? '',
         phone: initialValues.phone ?? '',
         email: initialValues.email ?? '',
-        commission: initialValues.commission !== undefined ? String(initialValues.commission) : '',
-        credit_limit: initialValues.credit_limit !== undefined ? String(initialValues.credit_limit) : '',
-        sale_type: initialValues.sale_type ? Number(initialValues.sale_type) : 2,
-        color_primary: initialValues.color_primary ?? '#044483',
-        color_secondary: initialValues.color_secondary ?? '#cad434',
+        color_primary: initialValues.color_primary ?? '#7c3aed',
+        color_secondary: initialValues.color_secondary ?? '#2e1065',
         country_id: isValidId(countryNum) ? String(countryNum) : '',
         state_id: isValidId(stateNum) ? String(stateNum) : '',
         city_id: isValidId(cityNum) ? String(cityNum) : '',
-        is_domestic: initialValues.is_domestic ?? true,
-        is_international: initialValues.is_international ?? true,
-        allows_passengers: initialValues.allows_passengers ?? false,
-        allows_groups: initialValues.allows_groups ?? false,
-        allows_pets: initialValues.allows_pets ?? false,
-        accumulates_points: Boolean(
-          initialValues.accumulates_points ?? initialValues.cashback
-        ),
-        cashback: Boolean(initialValues.cashback),
-        profit: Boolean(Number(initialValues.profit ?? 0)),
-        hotels_enabled: initialValues.hotels_enabled ?? false,
         manager_user_id: initialValues.manager_user_id ?? undefined,
         logo: null,
         logo_path: initialValues.logo_path ?? null,
-        website: isValidId(initialValues.website) ? String(parseId(initialValues.website)) : '',
       });
       if (initialValues.logo_path) {
         setLogoPreview(resolveStorageUrl(initialValues.logo_path as string) ?? (initialValues.logo_path as string));
@@ -399,7 +334,6 @@ const AgencyForm: React.FC<AgencyFormProps> = ({
     onSubmit(values);
   };
 
-  const saleTypes = useMemo(() => saleTypeOptions, []);
   const availableTaxRegimeOptions = useMemo(() => {
     const currentRegime = String(taxRegimeValue ?? '').trim();
     if (!currentRegime) return taxRegimeOptions;
@@ -583,23 +517,9 @@ const AgencyForm: React.FC<AgencyFormProps> = ({
           <div className="rounded-xl border border-base-300 bg-base-200/50 p-4 space-y-4">
             <div className="flex items-center gap-2">
               <div className="badge badge-accent badge-sm"></div>
-              <h3 className="text-lg font-semibold">Comercial</h3>
+              <h3 className="text-lg font-semibold">Administración</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="form-control">
-                <label className="label pb-1">
-                  <span className="label-text text-sm font-semibold">Comisión *</span>
-                </label>
-                <input className="input input-bordered w-full" {...register('commission')} />
-                {errors.commission && <span className="label-text-alt text-error">{errors.commission.message}</span>}
-              </div>
-              <div className="form-control">
-                <label className="label pb-1">
-                  <span className="label-text text-sm font-semibold">Cupo *</span>
-                </label>
-                <input className="input input-bordered w-full" {...register('credit_limit')} />
-                {errors.credit_limit && <span className="label-text-alt text-error">{errors.credit_limit.message}</span>}
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="form-control">
                 <label className="label pb-1">
                   <span className="label-text text-sm font-semibold">Encargado</span>
@@ -614,45 +534,13 @@ const AgencyForm: React.FC<AgencyFormProps> = ({
                 </select>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="form-control">
-                <label className="label pb-1">
-                  <span className="label-text text-sm font-semibold">Website (Compañía)</span>
-                </label>
-                <select className="select select-bordered w-full" {...register('website')}>
-                  <option value="">Selecciona compañía</option>
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
           </div>
 
           <div className="rounded-xl border border-base-300 bg-base-200/50 p-4 space-y-4">
             <div className="flex items-center gap-2">
               <div className="badge badge-info badge-sm"></div>
-              <h3 className="text-lg font-semibold">Apariencia y Venta</h3>
+              <h3 className="text-lg font-semibold">Identidad visual</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-              <div className="form-control">
-                <label className="label pb-1">
-                  <span className="label-text text-sm font-semibold">Tipo de venta *</span>
-                </label>
-                <select className="select select-bordered w-full" {...register('sale_type', { valueAsNumber: true })}>
-                  {saleTypes.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                {errors.sale_type && <span className="label-text-alt text-error">{errors.sale_type.message}</span>}
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="form-control col-span-1">
                 <label className="label pb-1">
@@ -691,41 +579,6 @@ const AgencyForm: React.FC<AgencyFormProps> = ({
               </div>
             </div>
           </div>
-
-          {!hideEnabledServicesSection && (
-            <div className="rounded-xl border border-base-300 bg-base-200/50 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="badge badge-success badge-sm"></div>
-                <h3 className="text-lg font-semibold">Servicios habilitados</h3>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="checkbox" {...register('is_domestic')} />
-                <span>Seguros Nacional</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="checkbox" {...register('is_international')} />
-                <span>Seguros Internacional</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="checkbox" {...register('allows_passengers')} />
-                <span>Seguros Pasajeros</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="checkbox" {...register('allows_groups')} />
-                <span>Seguros Grupos</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="checkbox" {...register('accumulates_points')} />
-                <span>Acumula puntos</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="checkbox" {...register('profit')} />
-                <span>Ocultar ganancia</span>
-              </label>
-              </div>
-            </div>
-          )}
 
           <div className="flex justify-end">
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>

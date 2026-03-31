@@ -158,7 +158,7 @@ const Sidebar: React.FC = () => {
     const renderProfileButton = () => (
         <button
             type="button"
-            className="btn btn-ghost flex w-full items-center justify-start space-x-2 px-2"
+            className="btn btn-ghost flex w-full items-center justify-start space-x-2 rounded-2xl border border-white/8 bg-white/6 px-2 text-white hover:bg-white/10"
             onClick={handleProfileClick}
         >
             <div className="avatar">
@@ -168,7 +168,7 @@ const Sidebar: React.FC = () => {
             </div>
             <div className="text-left">
                 <div className="text-sm font-semibold">{getDisplayName(user)}</div>
-                <div className="text-xs text-base-content/60">
+                <div className="text-xs text-white/60">
                     {user?.role?.[0]?.display_name || 'Usuario'}
                 </div>
             </div>
@@ -179,7 +179,7 @@ const Sidebar: React.FC = () => {
         <button
             type="button"
             onClick={handleLogoutClick}
-            className={`btn w-full justify-start gap-2 border-none text-white shadow-md bg-gradient-to-r from-red-500 to-[var(--color-primary)] hover:from-red-600 hover:to-[var(--color-primary)] ${isMobile ? "btn-sm" : ""}`}
+            className={`btn w-full justify-start gap-2 border-none text-white shadow-md bg-gradient-to-r from-[#6d28d9] to-[#a855f7] hover:from-[#5b21b6] hover:to-[#9333ea] ${isMobile ? "btn-sm" : ""}`}
         >
             <BiLogOut className="w-4 h-4" /> Cerrar Sesion
         </button>
@@ -195,7 +195,7 @@ const Sidebar: React.FC = () => {
                     <FaBars className="w-6 h-6" />
                 </button>
             )}
-            <aside className="menu-header app-menu app-sidebar-panel app-sidebar-panel--open bg-base-100 hidden lg:flex">
+            <aside className="menu-header app-menu app-sidebar-panel app-sidebar-panel--open hidden lg:flex">
                 <div className="app-sidebar-brand">
                     <div className="logo-header" />
                 </div>
@@ -244,7 +244,7 @@ const Sidebar: React.FC = () => {
                         className="fixed inset-0 bg-black bg-opacity-50"
                         onClick={() => setIsOpen(false)}
                     />
-                    <div className="relative w-64 bg-base-100 p-4 overflow-y-auto app-drawer app-drawer-panel">
+                    <div className="relative w-64 p-4 overflow-y-auto app-drawer app-drawer-panel">
                         <button
                             className="absolute top-2 right-2 btn btn-sm btn-circle"
                             onClick={() => setIsOpen(false)}
