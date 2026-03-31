@@ -13,10 +13,6 @@ const AgencyCreatePage: React.FC = () => {
       country_id: values.country_id ? Number(values.country_id) : undefined,
       state_id: values.state_id ? Number(values.state_id) : undefined,
       city_id: values.city_id ? Number(values.city_id) : undefined,
-      commission: values.commission !== undefined ? Number(values.commission) : undefined,
-      credit_limit: values.credit_limit !== undefined ? Number(values.credit_limit) : undefined,
-      sale_type: values.sale_type,
-      website: values.website ? Number(values.website) : null,
     };
     createAgency(payload, {
       onSuccess: (agency) => navigate(`/agencies/${agency.id}`),

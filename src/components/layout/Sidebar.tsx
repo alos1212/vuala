@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { BiGroup, BiCode, BiBell, BiLogOut, BiChevronDown, BiBuilding, BiTask, BiUser } from 'react-icons/bi';
 import { FaHome, FaCog, FaBars } from "react-icons/fa";
 import PermissionGuard from '../auth/PermissionGuard';
@@ -11,7 +11,6 @@ const Sidebar: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [openMenuByLevel, setOpenMenuByLevel] = useState<Record<number, string>>({});
     const { user, logout } = useAuth();
-    const location = useLocation();
     const navigate = useNavigate();
     const isAgencyProfile = Boolean(
         user?.agency_id ||
