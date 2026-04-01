@@ -12,10 +12,6 @@ const Sidebar: React.FC = () => {
     const [openMenuByLevel, setOpenMenuByLevel] = useState<Record<number, string>>({});
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const isAgencyProfile = Boolean(
-        user?.agency_id ||
-        (Array.isArray(user?.role) && user?.role.some((role) => role?.type === 1))
-    );
 
     const toggleMenu = (key: string, level: number) => {
         setOpenMenuByLevel((prev) => {
@@ -42,26 +38,25 @@ const Sidebar: React.FC = () => {
             permission: 'dashboard.admin'
         },
         {
-            name: 'Mi Agencia',
-            icon: BiBuilding,
-            path: '/my-agency',
-            visible: isAgencyProfile,
-            permission: 'my-agency.read',
+            name: 'Compañías',
+            icon: BiGroup,
+            path: '/companies',
+            permission: 'companies.list'
         },
         {
-            name: 'Agencias',
-            icon: BiGroup,
-            path: '/agencies',
-            permission: 'agencies.list'
+            name: 'Clientes',
+            icon: BiBuilding,
+            path: '/clients',
+            permission: 'clients.list'
         },
         {
             name: 'CRM',
             icon: BiTask,
             path: '#',
-            permission: 'agency-crm.activities.list',
+            permission: 'crm.activities.list',
             submenu: [
-                { name: 'Resumen CRM', path: '/crm', permission: 'agency-crm.activities.list', exact: true },
-                { name: 'Gestiones', path: '/crm/gestiones', permission: 'agency-crm.activities.list', exact: true },
+                { name: 'Resumen CRM', path: '/crm', permission: 'crm.activities.list', exact: true },
+                { name: 'Gestiones', path: '/crm/gestiones', permission: 'crm.activities.list', exact: true },
             ]
         },
         {
@@ -77,7 +72,8 @@ const Sidebar: React.FC = () => {
                     submenu: [
                         { name: 'Roles', icon: BiGroup, path: '/roles', permission: 'roles.list' },
                         { name: 'Permisos', icon: BiCode, path: '/permissions', permission: 'permissions.list' },
-                        { name: 'Agencias', icon: BiGroup, path: '/agencies', permission: 'agencies.list' },
+                        { name: 'Compañías', icon: BiGroup, path: '/companies', permission: 'companies.list' },
+                        { name: 'Clientes', icon: BiBuilding, path: '/clients', permission: 'clients.list' },
                     ]
                 },
                 {

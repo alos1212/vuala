@@ -29,7 +29,7 @@ const UserPointsCard: React.FC<UserPointsCardProps> = ({ title, data, isLoading 
   const pointsBalance = data?.wallet?.points_balance ?? 0;
   const pointsEarned = data?.totals?.points_earned ?? 0;
   const pointsDeducted = data?.totals?.points_deducted ?? 0;
-  const hasAgency = Boolean(data?.agency);
+  const hasCompany = Boolean(data?.company);
 
   return (
     <div className="card bg-base-100 shadow border border-base-200">
@@ -38,7 +38,7 @@ const UserPointsCard: React.FC<UserPointsCardProps> = ({ title, data, isLoading 
           <div>
             <h3 className="card-title">{title}</h3>
             <p className="text-sm text-base-content/60">
-              {hasAgency ? `Agencia: ${data?.agency?.name}` : "Este usuario no tiene agencia asociada."}
+              {hasCompany ? `Compania: ${data?.company?.name}` : "Este usuario no tiene compania asociada."}
             </p>
           </div>
           <div className={`badge ${data?.enabled ? "badge-success" : "badge-ghost"}`}>
@@ -140,4 +140,3 @@ const UserPointsCard: React.FC<UserPointsCardProps> = ({ title, data, isLoading 
 };
 
 export default UserPointsCard;
-

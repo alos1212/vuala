@@ -1,51 +1,32 @@
-export interface Zone {
-  id: number
-  name: string
-  country_id: number
-  country?: Country
-  states?: State[]
-  created_at: string
-  updated_at: string
+export interface Continent {
+  id: number;
+  name: string;
+  code?: string | null;
 }
 
 export interface Country {
-  id: number
-  name: string
-  code?: string
+  id: number;
+  name: string;
+  code?: string | null;
+  continent_id?: number | null;
 }
 
 export interface State {
-  id: number
-  name: string
-  country_id: number
-}
-
-export interface Continent {
-  id: number
-  name: string
-  countries?: Country[]
-}
-
-export interface GeoSelect {
-  id: string
-  name: string
-  type: 'continent' | 'country' | 'state' | 'city'
+  id: number;
+  name: string;
+  code?: string | null;
+  country_id?: number | null;
 }
 
 export interface City {
-  id: number
-  name: string
-  state_id: number
+  id: number;
+  name: string;
+  state_id?: number | null;
+  country_id?: number | null;
 }
 
-export interface CreateZoneRequest {
-  name: string
-  country_id: number
-  states?: number[]
-}
-
-export interface UpdateZoneRequest {
-  name?: string
-  country_id?: number
-  states?: number[]
+export interface GeoSelect {
+  value: number | string;
+  label: string;
+  children?: GeoSelect[];
 }

@@ -5,6 +5,7 @@ import { useAuth } from "../../hooks/useAuth";
 import UserPointsCard from "../../components/profile/UserPointsCard";
 import { userService } from "../../services/userService";
 import { getUserAvatar } from "../../utils/authHelpers";
+import SearchableSelect from "../../components/ui/SearchableSelect";
 
 interface ProfileFormState {
   name: string;
@@ -66,10 +67,10 @@ const ProfilePage: React.FC = () => {
     return user.role[0]?.display_name || "Usuario";
   }, [user]);
 
-  const agencyLabel = useMemo(() => {
-    if (user?.agency?.name) return user.agency.name;
-    if (user?.agency_id) return `Agencia #${user.agency_id}`;
-    return "Sin agencia";
+  const companyLabel = useMemo(() => {
+    if (user?.company?.name) return user.company.name;
+    if (user?.company_id) return `Compañía #${user.company_id}`;
+    return "Sin compañía";
   }, [user]);
 
   useEffect(() => {
@@ -226,8 +227,8 @@ const ProfilePage: React.FC = () => {
               </label>
 
               <label className="form-control">
-                <span className="label-text font-semibold">Agencia</span>
-                <input className="input input-bordered" value={agencyLabel} disabled />
+                <span className="label-text font-semibold">Compañía</span>
+                <input className="input input-bordered" value={companyLabel} disabled />
               </label>
 
               <label className="form-control">
@@ -237,11 +238,17 @@ const ProfilePage: React.FC = () => {
 
               <label className="form-control">
                 <span className="label-text font-semibold">Género</span>
-                <select className="select select-bordered" value={form.gender} onChange={handleChange("gender")}>
-                  <option value="">Seleccionar</option>
-                  <option value="M">Masculino</option>
-                  <option value="F">Femenino</option>
-                </select>
+                <SearchableSelect
+                  options={[
+                    { value: "", label: "Seleccionar" },
+                    { value: "M", label: "Masculino" },
+                    { value: "F", label: "Femenino" },
+                  ]}
+                  value={form.gender}
+                  onChange={(value) => setForm((prev) => ({ ...prev, gender: (value as "" | "M" | "F" | null) ?? "" }))}
+                  placeholder="Género"
+                  isClearable
+                />
               </label>
             </div>
 

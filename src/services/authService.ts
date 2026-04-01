@@ -4,7 +4,6 @@ import type { ApiResponse } from '../types/api';
 import type {
     LoginRequest,
     RegisterRequest,
-    AgencyRegisterRequest,
     AuthResponse,
     User,
     ForgotPasswordRequest,
@@ -22,11 +21,6 @@ export const authService = {
     register: async (userData: RegisterRequest): Promise<AuthResponse> => {
         const response = await api.post<ApiResponse<AuthResponse>>('/register', userData);
         return response.data.data;
-    },
-
-    registerAgency: async (payload: AgencyRegisterRequest): Promise<string> => {
-        const response = await api.post('/register-agency', payload);
-        return response?.data?.message || 'Registro enviado correctamente';
     },
 
     logout: async (): Promise<void> => {

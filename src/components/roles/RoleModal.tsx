@@ -6,6 +6,7 @@ import { BiX, BiShield } from 'react-icons/bi';
 import { useRoles } from '../../hooks/useRoles';
 import type { Role, Permission } from '../../types/auth';
 import PermissionsSelector from './PermissionsSelector';
+import SearchableSelect from '../ui/SearchableSelect';
 
 interface RoleFormData {
     name: string;
@@ -176,14 +177,17 @@ const RoleModal: React.FC<RoleModalProps> = ({
                                 Tipo de Rol *
                             </span>
                         </label>
-                        <select
-                            className={`select select-bordered ${errors.type ? 'select-error' : ''}`}
-                            {...register('type', { valueAsNumber: true })}
-                        >
-                            <option value={0}>Administrativo</option>
-                            <option value={1}>Agencia</option>
-                            <option value={2}>Comercial</option>
-                        </select>
+                        <SearchableSelect
+                            options={[
+                                { value: 0, label: 'Administrativo' },
+                                { value: 1, label: 'Agencia' },
+                                { value: 2, label: 'Comercial' },
+                            ]}
+                            value={watch('type')}
+                            onChange={(value) => setValue('type', Number(value ?? 0) as 0 | 1 | 2, { shouldValidate: true })}
+                            placeholder="Tipo de rol"
+                            isClearable={false}
+                        />
                         {errors.type && (
                             <label className="label">
                                 <span className="label-text-alt text-error">

@@ -8,6 +8,7 @@ import {
 } from 'react-icons/bi';
 import { useRoles } from '../../hooks/useRoles';
 import type { Permission } from '../../types/auth';
+import SearchableSelect from '../ui/SearchableSelect';
 
 const PermissionsPage: React.FC = () => {
     const { permissions, isLoading } = useRoles();
@@ -81,18 +82,21 @@ const PermissionsPage: React.FC = () => {
                         <span>
                             <BiFilter className="w-5 h-5" />
                         </span>
-                        <select
-                            className="select select-bordered"
-                            value={selectedGroup}
-                            onChange={(e) => setSelectedGroup(e.target.value)}
-                        >
-                            <option value="all">Todos los módulos</option>
-                            {modules.map(module => (
-                                <option key={module} value={module}>
-                                    {module.replace('_', ' ').toUpperCase()}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="min-w-[240px]">
+                            <SearchableSelect
+                                options={[
+                                    { value: 'all', label: 'Todos los módulos' },
+                                    ...modules.map((module) => ({
+                                        value: module,
+                                        label: module.replace('_', ' ').toUpperCase(),
+                                    })),
+                                ]}
+                                value={selectedGroup}
+                                onChange={(value) => setSelectedGroup(String(value ?? 'all'))}
+                                placeholder="Filtrar módulo"
+                                isClearable={false}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

@@ -21,11 +21,23 @@ export const PERMISSIONS = {
   PERMISSIONS_UPDATE: 'permissions.update',
   PERMISSIONS_DELETE: 'permissions.delete',
 
-  // Agencias
-  AGENCIES_LIST: 'agencies.list',
-  AGENCIES_CREATE: 'agencies.create',
-  AGENCIES_UPDATE: 'agencies.update',
-  AGENCIES_DELETE: 'agencies.delete',
+  // Companias
+  COMPANIES_LIST: 'companies.list',
+  COMPANIES_CREATE: 'companies.create',
+  COMPANIES_UPDATE: 'companies.update',
+  COMPANIES_DELETE: 'companies.delete',
+
+  // Clientes
+  CLIENTS_LIST: 'clients.list',
+  CLIENTS_CREATE: 'clients.create',
+  CLIENTS_UPDATE: 'clients.update',
+  CLIENTS_DELETE: 'clients.delete',
+
+  // CRM
+  CRM_ACTIVITIES_LIST: 'crm.activities.list',
+  CRM_ACTIVITIES_CREATE: 'crm.activities.create',
+  CRM_ACTIVITIES_UPDATE: 'crm.activities.update',
+  CRM_ACTIVITIES_DELETE: 'crm.activities.delete',
 
   // Dashboard
   DASHBOARD_VIEW: 'dashboard.view',
@@ -64,6 +76,7 @@ export const PERMISSION_GROUPS = {
     PERMISSIONS.DASHBOARD_VIEW,
     PERMISSIONS.USERS_LIST,
     PERMISSIONS.ROLES_LIST,
+    PERMISSIONS.COMPANIES_LIST,
   ],
 };
 

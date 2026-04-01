@@ -27,7 +27,7 @@ export const useAuthStore = create<AuthState>()(
             login: (user, token) => {
                 console.log(user);
 
-                let permissions;
+                let permissions: string[] = [];
                 if (Array.isArray(user.role)) {
                     // Si es array
                     if (user.role[0] && user.role[1]) {
@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>()(
                     user,
                     token,
                     isAuthenticated: true,
-                    permissions
+                    permissions: permissions ?? []
                 });
             },
 
@@ -67,7 +67,7 @@ export const useAuthStore = create<AuthState>()(
 
             updateUser: (user) => {
 
-                let permissions;
+                let permissions: string[] = [];
                 if (Array.isArray(user.role)) {
                     // Si es array
                     if (user.role[0] && user.role[1]) {
@@ -83,11 +83,13 @@ export const useAuthStore = create<AuthState>()(
                     const role = user.role as { id: number; name: string; permissions: Permission[] };
                     permissions = role.permissions.map(p => p.name);
                 }
-                set({ user, permissions });
+                set({ user, permissions: permissions ?? [] });
             },
 
             hasPermission: (permission) => {
-                return get().permissions.includes(permission);
+                const permissions = get().permissions;
+                if (!Array.isArray(permissions)) return false;
+                return permissions.includes(permission);
             },
 
             hasRole: (roleName) => {

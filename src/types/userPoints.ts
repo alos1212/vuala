@@ -2,7 +2,7 @@ import type { PaginatedResponse } from "./api";
 import type { User } from "./auth";
 
 export interface UserPointWallet {
-  agency_id: number | null;
+  company_id: number | null;
   user_id: number;
   points_balance: number;
   points_earned: number;
@@ -32,7 +32,7 @@ export interface UserPointMovement {
 
 export interface UserPointsData {
   enabled: boolean;
-  agency: {
+  company: {
     id: number;
     name: string;
   } | null;
@@ -45,4 +45,3 @@ export interface UserProfileWithPoints {
   user: User;
   points: UserPointsData;
 }
-

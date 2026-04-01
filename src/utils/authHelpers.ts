@@ -1,4 +1,5 @@
 import type { User } from '../types/auth';
+import type { Company } from '../types/company';
 
 const STORAGE_PREFIX = '/storage/';
 
@@ -107,6 +108,10 @@ export const getUserAvatar = (user: User | null): string => {
         resolveStorageUrl(user.avatar_url);
 
     return resolvedAvatar || '/assets/default-avatar.png';
+};
+
+export const getCompanyLogo = (company?: Pick<Company, 'logo_path'> | null): string | null => {
+    return resolveStorageUrl(company?.logo_path) || null;
 };
 
 // Función para verificar si la cuenta está activa

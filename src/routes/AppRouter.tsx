@@ -13,7 +13,6 @@ import RolesLayout from "../pages/roles/RolesLayout"
 
 // Pages
 import LoginPage from "../pages/auth/LoginPage"
-import RegisterPage from "../pages/auth/RegisterPage"
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage"
 import DashboardPage from "../pages/DashboardPage"
 import DashboardLandingPage from "../pages/DashboardLandingPage"
@@ -27,20 +26,21 @@ import PermissionsPage from "../components/roles/PermissionsPage"
 // Guards
 import ProtectedRoute from "../components/auth/ProtectedRoute"
 import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage"
-import AgenciesPage from "../pages/agencies/AgenciesPage"
-import AgencyDetailPage from "../pages/agencies/AgencyDetailPage"
-import AgencyCreatePage from "../pages/agencies/AgencyCreatePage"
-import AgencyEditPage from "../pages/agencies/AgencyEditPage"
-import MyAgencyEditPage from "../pages/agencies/MyAgencyEditPage"
-import AgencyCrmDashboardPage from "../pages/crm/AgencyCrmDashboardPage"
-import AgencyCrmTasksPage from "../pages/crm/AgencyCrmTasksPage"
-import AgencyCrmActivityFormPage from "../pages/crm/AgencyCrmActivityFormPage"
+import CompaniesPage from "../pages/companies/CompaniesPage"
+import CompanyDetailPage from "../pages/companies/CompanyDetailPage"
+import CompanyFormPage from "../pages/companies/CompanyFormPage"
+import ClientsPage from "../pages/clients/ClientsPage"
+import ClientDetailPage from "../pages/clients/ClientDetailPage"
+import ClientFormPage from "../pages/clients/ClientFormPage"
+import CrmDashboardPage from "../pages/crm/CrmDashboardPage"
+import CrmTasksPage from "../pages/crm/CrmTasksPage"
+import CrmActivityFormPage from "../pages/crm/CrmActivityFormPage"
 
 const AppRouter: React.FC = () => {
     const { isAuthenticated, hasPermission } = useAuthStore()
-    const authenticatedHome = hasPermission("agencies.list")
-        ? "/agencies"
-        : hasPermission("agency-crm.activities.list")
+    const authenticatedHome = hasPermission("companies.list")
+        ? "/companies"
+        : hasPermission("crm.activities.list")
             ? "/crm"
             : "/dashboard/home"
 
@@ -54,7 +54,7 @@ const AppRouter: React.FC = () => {
                             <Route path="/login" element={isAuthenticated ? <Navigate to={authenticatedHome} replace /> : <LoginPage />} />
                             <Route
                                 path="/register"
-                                element={isAuthenticated ? <Navigate to={authenticatedHome} replace /> : <RegisterPage />}
+                                element={<Navigate to={isAuthenticated ? authenticatedHome : "/login"} replace />}
                             />
 
                             <Route
@@ -78,30 +78,6 @@ const AppRouter: React.FC = () => {
                             <Route path="/dashboard" element={<DashboardLandingPage />} />
                             <Route path="/dashboard/home" element={<DashboardPage />} />
                             <Route path="/profile" element={<ProfilePage />} />
-                            <Route
-                                path="/my-agency"
-                                element={
-                                    <ProtectedRoute permission="my-agency.read">
-                                        <AgencyDetailPage selfMode />
-                                    </ProtectedRoute>
-                                }
-                            />
-                            <Route
-                                path="/my-agency/edit"
-                                element={
-                                    <ProtectedRoute permission="my-agency.update">
-                                        <MyAgencyEditPage />
-                                    </ProtectedRoute>
-                                }
-                            />
-                            <Route
-                                path="/my-agency/users/:userId/profile"
-                                element={
-                                    <ProtectedRoute permissionAny={["my-agency.users.list", "my-agency.users.update"]}>
-                                        <UserProfilePage />
-                                    </ProtectedRoute>
-                                }
-                            />
                             <Route element={<RolesLayout />}>
                                 <Route
                                     path="users"
@@ -138,74 +114,106 @@ const AppRouter: React.FC = () => {
 
                             </Route>
                             <Route
-                                path="agencies"
+                                path="companies"
                                 element={
-                                    <ProtectedRoute permission="agencies.list">
-                                        <AgenciesPage />
+                                    <ProtectedRoute permission="companies.list">
+                                        <CompaniesPage />
                                     </ProtectedRoute>
                                 }
                             />
                             <Route
-                                path="agencies/create"
+                                path="companies/create"
                                 element={
-                                    <ProtectedRoute permission="agencies.create">
-                                        <AgencyCreatePage />
+                                    <ProtectedRoute permission="companies.create">
+                                        <CompanyFormPage />
                                     </ProtectedRoute>
                                 }
                             />
                             <Route
-                                path="agencies/:id/edit"
+                                path="companies/:id/edit"
                                 element={
-                                    <ProtectedRoute permission="agencies.update">
-                                        <AgencyEditPage />
+                                    <ProtectedRoute permission="companies.update">
+                                        <CompanyFormPage />
                                     </ProtectedRoute>
                                 }
                             />
                             <Route
-                                path="agencies/:id"
+                                path="companies/:id"
                                 element={
-                                    <ProtectedRoute permission="agencies.list">
-                                        <AgencyDetailPage />
+                                    <ProtectedRoute permission="companies.read">
+                                        <CompanyDetailPage />
                                     </ProtectedRoute>
                                 }
                             />
                             <Route
-                                path="agencies/:agencyId/users/:userId/profile"
+                                path="companies/:companyId/users/:userId/profile"
                                 element={
-                                    <ProtectedRoute permissionAny={["agencies.list", "agencies.read", "agencies.update"]}>
+                                    <ProtectedRoute permissionAny={["companies.users.list", "companies.users.update"]}>
                                         <UserProfilePage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="clients"
+                                element={
+                                    <ProtectedRoute permission="clients.list">
+                                        <ClientsPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="clients/create"
+                                element={
+                                    <ProtectedRoute permission="clients.create">
+                                        <ClientFormPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="clients/:id/edit"
+                                element={
+                                    <ProtectedRoute permission="clients.update">
+                                        <ClientFormPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="clients/:id"
+                                element={
+                                    <ProtectedRoute permission="clients.read">
+                                        <ClientDetailPage />
                                     </ProtectedRoute>
                                 }
                             />
                             <Route
                                 path="crm"
                                 element={
-                                    <ProtectedRoute permission="agency-crm.activities.list">
-                                        <AgencyCrmDashboardPage />
+                                    <ProtectedRoute permission="crm.activities.list">
+                                        <CrmDashboardPage />
                                     </ProtectedRoute>
                                 }
                             />
                             <Route
                                 path="crm/gestiones"
                                 element={
-                                    <ProtectedRoute permission="agency-crm.activities.list">
-                                        <AgencyCrmTasksPage />
+                                    <ProtectedRoute permission="crm.activities.list">
+                                        <CrmTasksPage />
                                     </ProtectedRoute>
                                 }
                             />
                             <Route
                                 path="crm/gestiones/nueva"
                                 element={
-                                    <ProtectedRoute permission="agency-crm.activities.create">
-                                        <AgencyCrmActivityFormPage />
+                                    <ProtectedRoute permission="crm.activities.create">
+                                        <CrmActivityFormPage />
                                     </ProtectedRoute>
                                 }
                             />
                             <Route
                                 path="crm/gestiones/:id/editar"
                                 element={
-                                    <ProtectedRoute permission="agency-crm.activities.update">
-                                        <AgencyCrmActivityFormPage />
+                                    <ProtectedRoute permission="crm.activities.update">
+                                        <CrmActivityFormPage />
                                     </ProtectedRoute>
                                 }
                             />

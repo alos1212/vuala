@@ -4,39 +4,38 @@ import { useQuery } from "@tanstack/react-query";
 import { BiArrowBack, BiUserCircle } from "react-icons/bi";
 import UserPointsCard from "../../components/profile/UserPointsCard";
 import { userService } from "../../services/userService";
-import { agencyService } from "../../services/agencyService";
+import { companyService } from "../../services/companyService";
 
 const UserProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const { id, agencyId, userId } = useParams<{ id?: string; agencyId?: string; userId?: string }>();
+  const { id, companyId, userId } = useParams<{ id?: string; companyId?: string; userId?: string }>();
   const adminUserId = Number(id);
-  const agencyUserId = Number(userId);
-  const agencyNumericId = Number(agencyId);
+  const companyUserId = Number(userId);
+  const companyNumericId = Number(companyId);
 
   const isAdminProfile = Number.isFinite(adminUserId) && adminUserId > 0;
-  const isAgencyProfile = Number.isFinite(agencyUserId) && agencyUserId > 0;
-  const isScopedAgencyRoute = Number.isFinite(agencyNumericId) && agencyNumericId > 0;
-  const resolvedUserId = isAdminProfile ? adminUserId : isAgencyProfile ? agencyUserId : 0;
+  const isCompanyProfile = Number.isFinite(companyUserId) && companyUserId > 0;
+  const isScopedCompanyRoute = Number.isFinite(companyNumericId) && companyNumericId > 0;
+  const resolvedUserId = isAdminProfile ? adminUserId : isCompanyProfile ? companyUserId : 0;
 
   const [pointsPage, setPointsPage] = useState(1);
 
   const profileQuery = useQuery({
-    queryKey: ["user-profile-with-points", { adminUserId, agencyNumericId, agencyUserId, pointsPage }],
+    queryKey: ["user-profile-with-points", { adminUserId, companyNumericId, companyUserId, pointsPage }],
     queryFn: async () => {
       if (isAdminProfile) {
         return userService.getUserProfileWithPoints(adminUserId, { page: pointsPage, per_page: 10 });
       }
 
-      if (isScopedAgencyRoute) {
-        return agencyService.getAgencyUserProfileWithPoints(agencyNumericId, agencyUserId, {
-          page: pointsPage,
-          per_page: 10,
-        });
+      if (isScopedCompanyRoute) {
+        const data = await companyService.getCompanyUserProfile(companyNumericId, companyUserId);
+        return { user: data.user ?? data, points: undefined };
       }
 
-      return agencyService.getMyAgencyUserProfileWithPoints(agencyUserId, { page: pointsPage, per_page: 10 });
+      const data = await companyService.getMyCompanyUserProfile(companyUserId);
+      return { user: data.user ?? data, points: undefined };
     },
-    enabled: resolvedUserId > 0 && (isAdminProfile || isAgencyProfile),
+    enabled: resolvedUserId > 0 && (isAdminProfile || isCompanyProfile),
     placeholderData: (previousData) => previousData,
   });
 
@@ -61,9 +60,9 @@ const UserProfilePage: React.FC = () => {
   const { user, points } = profileQuery.data;
   const backPath = isAdminProfile
     ? "/users"
-    : isScopedAgencyRoute
-      ? `/agencies/${agencyNumericId}`
-      : "/my-agency";
+    : isScopedCompanyRoute
+      ? `/companies/${companyNumericId}`
+      : "/companies";
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -97,18 +96,20 @@ const UserProfilePage: React.FC = () => {
             <div className="font-semibold">{user.status === "inactive" ? "Inactivo" : "Activo"}</div>
           </div>
           <div>
-            <div className="text-sm text-base-content/60">Agencia</div>
-            <div className="font-semibold">{user.agency?.name || (user.agency_id ? `Agencia #${user.agency_id}` : "Sin agencia")}</div>
+            <div className="text-sm text-base-content/60">Compañía</div>
+            <div className="font-semibold">{user.company?.name || (user.company_id ? `Compañía #${user.company_id}` : "Sin compañía")}</div>
           </div>
         </div>
       </div>
 
-      <UserPointsCard
-        title={`Puntos de ${user.name}`}
-        data={points}
-        isLoading={profileQuery.isFetching}
-        onPageChange={setPointsPage}
-      />
+      {points && (
+        <UserPointsCard
+          title={`Puntos de ${user.name}`}
+          data={points}
+          isLoading={profileQuery.isFetching}
+          onPageChange={setPointsPage}
+        />
+      )}
     </div>
   );
 };

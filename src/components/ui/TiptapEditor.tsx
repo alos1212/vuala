@@ -8,7 +8,8 @@ import {Table} from '@tiptap/extension-table';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 import TableRow from '@tiptap/extension-table-row';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import SearchableSelect from './SearchableSelect';
 
 interface TiptapEditorProps {
   content: string;
@@ -18,6 +19,7 @@ interface TiptapEditorProps {
 
 export default function TiptapEditor({ content, onChange, placeholder }: TiptapEditorProps) {
 console.log(placeholder);
+  const [fontFamilyValue, setFontFamilyValue] = useState<string>('');
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -161,15 +163,24 @@ console.log(placeholder);
         </div>
 
         {/* Fuentes */}
-        <select
-          onChange={(e) => setFontFamily(e.target.value)}
-          className="p-1 border rounded text-xs"
-        >
-          <option value="">Fuente</option>
-          <option value="Arial, sans-serif">Arial</option>
-          <option value="'Times New Roman', serif">Times New Roman</option>
-          <option value="'Courier New', monospace">Courier New</option>
-        </select>
+        <div className="min-w-[180px]">
+          <SearchableSelect
+            options={[
+              { value: '', label: 'Fuente' },
+              { value: 'Arial, sans-serif', label: 'Arial' },
+              { value: "'Times New Roman', serif", label: 'Times New Roman' },
+              { value: "'Courier New', monospace", label: 'Courier New' },
+            ]}
+            value={fontFamilyValue}
+            onChange={(value) => {
+              const nextValue = String(value ?? '');
+              setFontFamilyValue(nextValue);
+              setFontFamily(nextValue);
+            }}
+            placeholder="Fuente"
+            isClearable
+          />
+        </div>
 
         {/* Tablas */}
         <button

@@ -5,11 +5,11 @@ import { useAuthStore } from "../stores/authStore";
 const DashboardLandingPage: React.FC = () => {
     const { hasPermission } = useAuthStore();
 
-    if (hasPermission("agencies.list")) {
-        return <Navigate to="/agencies" replace />;
+    if (hasPermission("companies.list")) {
+        return <Navigate to="/companies" replace />;
     }
 
-    if (hasPermission("agency-crm.activities.list")) {
+    if (hasPermission("crm.activities.list")) {
         return <Navigate to="/crm" replace />;
     }
 

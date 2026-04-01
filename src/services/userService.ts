@@ -11,7 +11,7 @@ export const userService = {
         search?: string;
         role?: string;
         status?: string;
-        agency_id?: number;
+        company_id?: number;
     }): Promise<PaginatedResponse<User>> => {
         const response = await api.get<PaginatedResponse<User>>('/users', { params });
         return response.data;
@@ -27,7 +27,7 @@ export const userService = {
         email: string;
         password: string;
         password_confirmation: string;
-        agency_id?: number | null;
+        company_id?: number | null;
         roles?: number[];
         status?: 'active' | 'inactive';
         birthdate?: string;
@@ -38,7 +38,7 @@ export const userService = {
         return response.data.data;
     },
 
-    updateUser: async (id: number, userData: Partial<User> & { roles?: number[]; agency_id?: number | null }): Promise<User> => {
+    updateUser: async (id: number, userData: Partial<User> & { roles?: number[]; company_id?: number | null }): Promise<User> => {
         const response = await api.put<ApiResponse<User>>(`/users/${id}`, userData);
         return response.data.data;
     },
@@ -49,11 +49,6 @@ export const userService = {
 
     updateUserStatus: async (id: number, _status?: 'active' | 'inactive'): Promise<User> => {
         const response = await api.put<ApiResponse<User>>(`/users/${id}/toggle-status`);
-        return response.data.data;
-    },
-
-    getAgencyManagers: async (): Promise<User[]> => {
-        const response = await api.get<ApiResponse<User[]>>('/agencies/managers');
         return response.data.data;
     },
 

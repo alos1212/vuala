@@ -171,17 +171,8 @@ const LoginPage: React.FC = () => {
                             </button>
                         </form>
 
-                        {/* Divider */}
-                        <div className="divider">o</div>
-
-                        {/* Register Link */}
-                        <div className="text-center">
-                            <p className="text-base-content/60">
-                                ¿No tienes cuenta?{' '}
-                                <Link to="/register" className="link link-primary font-semibold">
-                                    Regístrate aquí
-                                </Link>
-                            </p>
+                        <div className="text-center text-sm text-base-content/60">
+                            Si necesitas acceso, solicita la creación de tu usuario al administrador del sistema.
                         </div>
                     </div>
                 </div>

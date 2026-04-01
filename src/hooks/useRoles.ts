@@ -58,7 +58,7 @@ export const useRoles = () => {
 
   return {
     roles: rolesQuery.data || [],
-    agencyRoles: (rolesQuery.data || []).filter(role => role.type === 1),
+    companyRoles: (rolesQuery.data || []).filter(role => role.type === 1),
     permissions: permissionsQuery.data || [],
     isLoading: rolesQuery.isLoading || permissionsQuery.isLoading,
     createRole: createRoleMutation.mutate,

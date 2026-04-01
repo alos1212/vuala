@@ -14,8 +14,8 @@ export interface User {
     gender?: 'M' | 'F' | null;
     status: 'active' | 'inactive';
     role: Role[];
-    agency_id?: number | null;
-    agency?: {
+    company_id?: number | null;
+    company?: {
         id?: number;
         name?: string;
     } | null;
@@ -53,22 +53,6 @@ export interface LoginRequest {
 export interface RegisterRequest {
     name: string;
     email: string;
-    password: string;
-    password_confirmation: string;
-}
-
-export interface AgencyRegisterRequest {
-    agency_name: string;
-    agency_tax_id: string;
-    agency_phone?: string;
-    agency_email?: string;
-    agency_country_id: number;
-    agency_state_id: number;
-    agency_city_id: number;
-    name: string;
-    email: string;
-    birthdate?: string;
-    gender?: 'M' | 'F';
     password: string;
     password_confirmation: string;
 }

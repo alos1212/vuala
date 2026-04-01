@@ -1,8 +1,38 @@
-
+import { useEffect } from 'react';
 import { usePageStore } from '../../stores/usePageStore';
 
 export const LayoutAuth = ({ children }: { children: React.ReactNode }) => {
-    const layoutPage = usePageStore.getState().page;
+    const layoutPage = usePageStore((state) => state.page);
+
+    useEffect(() => {
+        const domainStyles: Record<string, string> = {
+            '2': '/styles/page2.css',
+        };
+
+        const cssFile = domainStyles[layoutPage] || '/styles/page1.css';
+        const currentLink = document.getElementById('dynamic-css') as HTMLLinkElement | null;
+
+        if (currentLink?.href?.endsWith(cssFile)) {
+            return;
+        }
+
+        if (currentLink) {
+            currentLink.remove();
+        }
+
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = cssFile;
+        link.id = 'dynamic-css';
+        document.head.appendChild(link);
+
+        return () => {
+            const mountedLink = document.getElementById('dynamic-css');
+            if (mountedLink?.getAttribute('href') === cssFile) {
+                mountedLink.remove();
+            }
+        };
+    }, [layoutPage]);
 
     if (layoutPage === '1') {
         return (

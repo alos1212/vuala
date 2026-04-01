@@ -3,11 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BiEdit, BiPlus, BiTrash, BiUserCheck, BiUserCircle, BiUserX } from "react-icons/bi";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import AgencyUserModal, { type AgencyUserFormValues } from "../../components/agencies/AgencyUserModal";
+import UserModal, { type UserFormValues } from "../../components/users/UserModal";
 import { roleService } from "../../services/roleService";
 import { userService } from "../../services/userService";
 import { useAuthStore } from "../../stores/authStore";
 import type { Role, User } from "../../types/auth";
+import SearchableSelect from "../../components/ui/SearchableSelect";
 
 const PAGE_SIZE = 20;
 const SERVER_FETCH_SIZE = 500;
@@ -41,9 +42,9 @@ const getPrimaryRole = (user: User): Role | null => {
   return roles.length > 0 ? roles[0] : null;
 };
 
-const isAgencyProfileUser = (user: User): boolean => {
+const isCompanyProfileUser = (user: User): boolean => {
   const role = getPrimaryRole(user);
-  return Boolean(user.agency_id) || role?.type === 1;
+  return Boolean(user.company_id) || role?.type === 1;
 };
 
 const resolveUserStatus = (user: User): "active" | "inactive" => {
@@ -92,7 +93,7 @@ const UsersPage: React.FC = () => {
 
   const [draftFilters, setDraftFilters] = useState<UserFilters>(defaultFilters);
   const [filters, setFilters] = useState<UserFilters>(defaultFilters);
-  const [includeAgencyProfiles, setIncludeAgencyProfiles] = useState(false);
+  const [includeCompanyProfiles, setIncludeCompanyProfiles] = useState(true);
   const [page, setPage] = useState(1);
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -187,14 +188,14 @@ const UsersPage: React.FC = () => {
   }, [rolesQuery.data, rawUsers]);
 
   const visibleRoleOptions = useMemo(
-    () => (includeAgencyProfiles ? roleOptions : roleOptions.filter((role) => role.type !== 1)),
-    [includeAgencyProfiles, roleOptions],
+    () => (includeCompanyProfiles ? roleOptions : roleOptions.filter((role) => role.type !== 1)),
+    [includeCompanyProfiles, roleOptions],
   );
 
   const visibleUsers = useMemo(() => {
-    if (includeAgencyProfiles) return rawUsers;
-    return rawUsers.filter((user) => !isAgencyProfileUser(user));
-  }, [includeAgencyProfiles, rawUsers]);
+    if (includeCompanyProfiles) return rawUsers;
+    return rawUsers.filter((user) => !isCompanyProfileUser(user));
+  }, [includeCompanyProfiles, rawUsers]);
 
   const totalVisible = visibleUsers.length;
   const totalPages = Math.max(1, Math.ceil(totalVisible / PAGE_SIZE));
@@ -206,22 +207,22 @@ const UsersPage: React.FC = () => {
   }, [page, totalPages]);
 
   useEffect(() => {
-    if (includeAgencyProfiles) return;
+    if (includeCompanyProfiles) return;
 
     const draftRoleId = Number(draftFilters.role);
     const appliedRoleId = Number(filters.role);
-    const isDraftAgencyRole = roleOptions.some((role) => role.id === draftRoleId && role.type === 1);
-    const isAppliedAgencyRole = roleOptions.some((role) => role.id === appliedRoleId && role.type === 1);
+    const isDraftCompanyRole = roleOptions.some((role) => role.id === draftRoleId && role.type === 1);
+    const isAppliedCompanyRole = roleOptions.some((role) => role.id === appliedRoleId && role.type === 1);
 
-    if (isDraftAgencyRole) {
+    if (isDraftCompanyRole) {
       setDraftFilters((prev) => ({ ...prev, role: "" }));
     }
 
-    if (isAppliedAgencyRole) {
+    if (isAppliedCompanyRole) {
       setFilters((prev) => ({ ...prev, role: "" }));
       setPage(1);
     }
-  }, [includeAgencyProfiles, draftFilters.role, filters.role, roleOptions]);
+  }, [includeCompanyProfiles, draftFilters.role, filters.role, roleOptions]);
 
   const pagedUsers = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
@@ -234,9 +235,8 @@ const UsersPage: React.FC = () => {
   };
 
   const openCreateUserModal = () => {
-    const availableNonAgencyRoles = roleOptions.filter((role) => role.type !== 1);
-    if (availableNonAgencyRoles.length === 0) {
-      toast.error("No hay roles administrativos disponibles para crear usuarios.");
+    if (roleOptions.length === 0) {
+      toast.error("No hay roles disponibles para crear usuarios.");
       return;
     }
     setEditingUser(null);
@@ -257,7 +257,7 @@ const UsersPage: React.FC = () => {
   const handleResetFilters = () => {
     setDraftFilters(defaultFilters);
     setFilters(defaultFilters);
-    setIncludeAgencyProfiles(false);
+    setIncludeCompanyProfiles(true);
     setPage(1);
   };
 
@@ -284,17 +284,10 @@ const UsersPage: React.FC = () => {
   };
 
   const modalRoles = useMemo(() => {
-    if (!editingUser) return roleOptions.filter((role) => role.type !== 1);
-    return isAgencyProfileUser(editingUser)
-      ? roleOptions.filter((role) => role.type === 1)
-      : roleOptions.filter((role) => role.type !== 1);
+    return roleOptions;
   }, [editingUser, roleOptions]);
 
-  const handleUserSubmit = (values: AgencyUserFormValues) => {
-    const selectedRoleId = Array.isArray(values.roles) ? values.roles[0] : undefined;
-    const selectedRole = roleOptions.find((role) => role.id === selectedRoleId);
-    const selectedRoleIsAgency = selectedRole?.type === 1;
-
+  const handleUserSubmit = (values: UserFormValues) => {
     const payload: {
       name: string;
       email: string;
@@ -305,7 +298,7 @@ const UsersPage: React.FC = () => {
       birthdate?: string;
       birth_date?: string;
       gender?: "M" | "F";
-      agency_id?: number | null;
+      company_id?: number | null;
     } = {
       name: values.name,
       email: values.email,
@@ -314,7 +307,7 @@ const UsersPage: React.FC = () => {
       birthdate: values.birthdate || undefined,
       birth_date: values.birthdate || undefined,
       gender: values.gender || undefined,
-      agency_id: selectedRoleIsAgency ? editingUser?.agency_id ?? null : null,
+      company_id: editingUser?.company_id ?? null,
     };
 
     if (values.password) {
@@ -333,7 +326,7 @@ const UsersPage: React.FC = () => {
       password: payload.password || "",
       password_confirmation: payload.password_confirmation || "",
       roles: payload.roles,
-      agency_id: payload.agency_id,
+      company_id: payload.company_id,
       status: payload.status,
       birthdate: payload.birthdate,
       birth_date: payload.birth_date,
@@ -349,7 +342,7 @@ const UsersPage: React.FC = () => {
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Usuarios del sistema</h1>
-          <p className="text-base-content/60">Gestiona administradores y usuarios de roles internos.</p>
+          <p className="text-base-content/60">Gestiona usuarios internos del sistema y de las companias.</p>
         </div>
         {canCreateUsers && (
           <button className="btn btn-primary" onClick={openCreateUserModal}>
@@ -373,46 +366,51 @@ const UsersPage: React.FC = () => {
 
           <label className="form-control">
             <span className="label-text font-semibold">Estado</span>
-            <select
-              className="select select-bordered"
+            <SearchableSelect
+              options={[
+                { value: "all", label: "Todos" },
+                { value: "active", label: "Activos" },
+                { value: "inactive", label: "Inactivos" },
+              ]}
               value={draftFilters.status}
-              onChange={(e) => setDraftFilters((prev) => ({ ...prev, status: e.target.value as StatusFilter }))}
-            >
-              <option value="all">Todos</option>
-              <option value="active">Activos</option>
-              <option value="inactive">Inactivos</option>
-            </select>
+              onChange={(value) =>
+                setDraftFilters((prev) => ({ ...prev, status: (value as StatusFilter) || "all" }))
+              }
+              placeholder="Estado"
+              isClearable={false}
+            />
           </label>
 
           <label className="form-control">
             <span className="label-text font-semibold">Rol</span>
-            <select
-              className="select select-bordered"
+            <SearchableSelect
+              options={[
+                { value: "", label: "Todos" },
+                ...visibleRoleOptions.map((role) => ({
+                  value: String(role.id),
+                  label: role.display_name,
+                })),
+              ]}
               value={draftFilters.role}
-              onChange={(e) => setDraftFilters((prev) => ({ ...prev, role: e.target.value }))}
-            >
-              <option value="">Todos</option>
-              {visibleRoleOptions.map((role) => (
-                <option key={role.id} value={String(role.id)}>
-                  {role.display_name}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setDraftFilters((prev) => ({ ...prev, role: String(value ?? "") }))}
+              placeholder="Rol"
+              isClearable
+            />
           </label>
 
           <label className="form-control justify-end">
-            <span className="label-text font-semibold">Perfiles de agencia</span>
+            <span className="label-text font-semibold">Usuarios de compania</span>
             <label className="cursor-pointer label justify-start gap-3 px-0">
               <input
                 type="checkbox"
                 className="toggle toggle-primary"
-                checked={includeAgencyProfiles}
+                checked={includeCompanyProfiles}
                 onChange={(e) => {
-                  setIncludeAgencyProfiles(e.target.checked);
+                  setIncludeCompanyProfiles(e.target.checked);
                   setPage(1);
                 }}
               />
-              <span className="label-text">{includeAgencyProfiles ? "Incluidos" : "Ocultos"}</span>
+              <span className="label-text">{includeCompanyProfiles ? "Incluidos" : "Ocultos"}</span>
             </label>
           </label>
 
@@ -439,7 +437,7 @@ const UsersPage: React.FC = () => {
                   <th>Nombre</th>
                   <th>Correo</th>
                   <th>Rol</th>
-                  <th>Agencia</th>
+                  <th>Compania</th>
                   <th>Estado</th>
                   <th className="text-right">Acciones</th>
                 </tr>
@@ -464,18 +462,18 @@ const UsersPage: React.FC = () => {
                 {!usersQuery.isLoading &&
                   pagedUsers.map((user) => {
                     const role = getPrimaryRole(user);
-                    const isAgencyProfile = isAgencyProfileUser(user);
+                    const isCompanyProfile = isCompanyProfileUser(user);
                     const status = resolveUserStatus(user);
-                    const agencyName = (user as unknown as { agency?: { name?: string } }).agency?.name;
+                    const companyName = user.company?.name;
                     return (
                       <tr key={user.id}>
                         <td>
                           <div className="font-semibold">{user.name}</div>
-                          {isAgencyProfile && <span className="badge badge-warning badge-sm mt-1">Perfil agencia</span>}
+                          {isCompanyProfile && <span className="badge badge-warning badge-sm mt-1">Usuario de compania</span>}
                         </td>
                         <td>{user.email}</td>
                         <td>{role?.display_name || "-"}</td>
-                        <td>{agencyName || (user.agency_id ? `Agencia #${user.agency_id}` : "Sin agencia")}</td>
+                        <td>{companyName || (user.company_id ? `Compania #${user.company_id}` : "Sin compania")}</td>
                         <td>
                           <span className={`badge ${status === "inactive" ? "badge-ghost" : "badge-success"}`}>
                             {status === "inactive" ? "Inactivo" : "Activo"}
@@ -536,7 +534,7 @@ const UsersPage: React.FC = () => {
         </div>
       </div>
 
-      <AgencyUserModal
+      <UserModal
         isOpen={isUserModalOpen}
         onClose={closeUserModal}
         onSubmit={handleUserSubmit}
