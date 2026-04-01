@@ -94,8 +94,9 @@ const CompanyDetailPage: React.FC = () => {
   });
 
   const handleCreateUser = async () => {
+    if (!Number.isFinite(companyId)) return;
     if (!newUser.name.trim() || !newUser.email.trim() || !newUser.password.trim() || !newUser.role_id) return;
-    await companyService.createCompanyUser(company.id, {
+    await companyService.createCompanyUser(companyId, {
       name: newUser.name,
       email: newUser.email,
       password: newUser.password,
@@ -141,6 +142,7 @@ const CompanyDetailPage: React.FC = () => {
   };
 
   const handleUpdateUser = async () => {
+    if (!Number.isFinite(companyId)) return;
     if (!editingUserId || !editUser.name.trim() || !editUser.email.trim() || !editUser.role_id) return;
     const currentUser = users.find((user) => user.id === editingUserId);
 
@@ -156,7 +158,7 @@ const CompanyDetailPage: React.FC = () => {
       payload.password_confirmation = editUser.password_confirmation || editUser.password;
     }
 
-    await companyService.updateCompanyUser(company.id, editingUserId, payload);
+    await companyService.updateCompanyUser(companyId, editingUserId, payload);
     queryClient.invalidateQueries({ queryKey: ['company-users', companyId] });
     handleCancelEditUser();
   };
