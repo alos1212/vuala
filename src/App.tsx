@@ -31,7 +31,7 @@ function App() {
   }, [login, logout]);
 
   useEffect(() => {
-    document.title = "WOW Assistance";
+    document.title = "Vuala CRM";
   }, []);
 
   return (
