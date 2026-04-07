@@ -65,6 +65,9 @@ const ClientsPage: React.FC = () => {
             <thead>
               <tr>
                 <th>Cliente</th>
+                <th>Tipo</th>
+                <th>Categoría</th>
+                <th>Documento</th>
                 <th>Compañía</th>
                 <th>Asignado a</th>
                 <th>Contacto</th>
@@ -75,6 +78,13 @@ const ClientsPage: React.FC = () => {
               {clients.map((client) => (
                 <tr key={client.id}>
                   <td className="font-semibold">{client.name}</td>
+                  <td>
+                    <span className={`badge ${client.client_type === 'person' ? 'badge-info' : 'badge-secondary'}`}>
+                      {client.client_type === 'person' ? 'Persona' : 'Empresa'}
+                    </span>
+                  </td>
+                  <td>{client.category?.name || '-'}</td>
+                  <td>{[client.document_type, client.tax_id].filter(Boolean).join(' ') || '-'}</td>
                   <td>{client.company?.name || `#${client.company_id}`}</td>
                   <td>{client.assignedUser?.name || '-'}</td>
                   <td>

@@ -43,7 +43,7 @@ const MainLayout: React.FC = () => {
         </aside>
         <main className="app-main">
           <div className="app-content">
-            <Outlet />
+            <Outlet key={`${location.pathname}${location.search}`} />
           </div>
         </main>
       </div>

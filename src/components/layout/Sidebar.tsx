@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BiGroup, BiCode, BiBell, BiLogOut, BiChevronDown, BiBuilding, BiTask, BiUser } from 'react-icons/bi';
 import { FaHome, FaCog, FaBars } from "react-icons/fa";
 import PermissionGuard from '../auth/PermissionGuard';
@@ -11,6 +11,7 @@ const Sidebar: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [openMenuByLevel, setOpenMenuByLevel] = useState<Record<number, string>>({});
     const { user, logout } = useAuth();
+    const location = useLocation();
     const navigate = useNavigate();
 
     const toggleMenu = (key: string, level: number) => {
@@ -86,6 +87,14 @@ const Sidebar: React.FC = () => {
         },
     ];
 
+    const isItemActive = (item: any) => {
+        if (!item?.path || item.path === '#') return false;
+        if (item.exact) {
+            return location.pathname === item.path;
+        }
+        return location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+    };
+
     const renderMenuItems = (items: any[], level = 0, isMobile = false) => (
         <ul className={`app-accordion-list ${level > 0 ? "app-accordion-children" : ""}`}>
             {items.map((item) => {
@@ -112,17 +121,14 @@ const Sidebar: React.FC = () => {
                                 {isOpen && renderMenuItems(item.submenu, level + 1, isMobile)}
                             </>
                         ) : (
-                            <NavLink
-                                to={item.path}
-                                end={Boolean(item.exact)}
+                            <a
+                                href={item.path}
                                 onClick={() => setIsOpen(false)}
-                                className={({ isActive }) => {
-                                    return `${baseItemClass} ${isActive ? "active" : ""}`;
-                                }}
+                                className={`${baseItemClass} ${isItemActive(item) ? "active" : ""}`}
                             >
                                 {item.icon && <item.icon className="w-5 h-5" />}
                                 <span className="app-accordion-label">{item.name}</span>
-                            </NavLink>
+                            </a>
                         )}
                     </li>
                 );

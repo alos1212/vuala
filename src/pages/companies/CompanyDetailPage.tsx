@@ -4,10 +4,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BiBuilding, BiEnvelope, BiHide, BiMap, BiPhone, BiShow, BiUser, BiUserPlus, BiPencil } from 'react-icons/bi';
 import { companyService } from '../../services/companyService';
 import { clientService } from '../../services/clientService';
+import { clientCategoryService } from '../../services/clientCategoryService';
 import { roleService } from '../../services/roleService';
 import { geoService } from '../../services/geoService';
 import { getCompanyLogo } from '../../utils/authHelpers';
 import SearchableSelect from '../../components/ui/SearchableSelect';
+import { useAuthStore } from '../../stores/authStore';
+import type { ClientCategory } from '../../types/clientCategory';
 
 const getUserRoleId = (user: any): number | null => {
   if (Array.isArray(user?.role) && user.role.length > 0) {
@@ -44,8 +47,16 @@ const CompanyDetailPage: React.FC = () => {
   });
   const [showCreatePassword, setShowCreatePassword] = React.useState(false);
   const [showEditPassword, setShowEditPassword] = React.useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = React.useState(false);
+  const [editingCategory, setEditingCategory] = React.useState<ClientCategory | null>(null);
+  const [categoryForm, setCategoryForm] = React.useState({ name: '', description: '', is_active: true });
+  const [isSavingCategory, setIsSavingCategory] = React.useState(false);
   const { id } = useParams<{ id: string }>();
   const companyId = Number(id);
+  const hasPermission = useAuthStore((state) => state.hasPermission);
+  const canListCategories = hasPermission('clients.categories.list');
+  const canCreateCategories = hasPermission('clients.categories.create');
+  const canUpdateCategories = hasPermission('clients.categories.update');
 
   const { data: company, isLoading } = useQuery({
     queryKey: ['company', companyId],
@@ -68,6 +79,11 @@ const CompanyDetailPage: React.FC = () => {
     queryKey: ['company-clients', companyId],
     queryFn: () => clientService.getClients({ company_id: companyId, per_page: 20 }),
     enabled: Number.isFinite(companyId),
+  });
+  const { data: categories = [] } = useQuery({
+    queryKey: ['client-categories', companyId],
+    queryFn: () => clientCategoryService.getCategories(companyId),
+    enabled: Number.isFinite(companyId) && canListCategories,
   });
 
   const clients = clientsData?.data ?? [];
@@ -161,6 +177,52 @@ const CompanyDetailPage: React.FC = () => {
     await companyService.updateCompanyUser(companyId, editingUserId, payload);
     queryClient.invalidateQueries({ queryKey: ['company-users', companyId] });
     handleCancelEditUser();
+  };
+
+  const openCreateCategoryModal = () => {
+    setEditingCategory(null);
+    setCategoryForm({ name: '', description: '', is_active: true });
+    setIsCategoryModalOpen(true);
+  };
+
+  const openEditCategoryModal = (category: ClientCategory) => {
+    setEditingCategory(category);
+    setCategoryForm({
+      name: category.name ?? '',
+      description: category.description ?? '',
+      is_active: category.is_active ?? true,
+    });
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleSaveCategory = async () => {
+    if (!Number.isFinite(companyId) || !categoryForm.name.trim() || isSavingCategory) return;
+
+    setIsSavingCategory(true);
+    try {
+      if (editingCategory) {
+        await clientCategoryService.updateCategory(editingCategory.id, {
+          name: categoryForm.name.trim(),
+          description: categoryForm.description.trim() || undefined,
+          is_active: categoryForm.is_active,
+        });
+      } else {
+        await clientCategoryService.createCategory({
+          company_id: companyId,
+          name: categoryForm.name.trim(),
+          description: categoryForm.description.trim() || undefined,
+        });
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['client-categories', companyId] });
+      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      await queryClient.invalidateQueries({ queryKey: ['company-clients', companyId] });
+      setIsCategoryModalOpen(false);
+      setEditingCategory(null);
+      setCategoryForm({ name: '', description: '', is_active: true });
+    } finally {
+      setIsSavingCategory(false);
+    }
   };
 
   if (isLoading || !company) {
@@ -507,6 +569,123 @@ const CompanyDetailPage: React.FC = () => {
           </div>
         )}
       </section>
+
+      {(canListCategories || canCreateCategories || canUpdateCategories) && (
+        <section className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold">Categorías de clientes</h2>
+              <p className="text-sm text-base-content/60">
+                Administra las categorías de clientes de esta compañía.
+              </p>
+            </div>
+            {canCreateCategories && (
+              <button type="button" className="btn btn-primary btn-sm" onClick={openCreateCategoryModal}>
+                Nueva categoría
+              </button>
+            )}
+          </div>
+
+          {canListCategories ? (
+            categories.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {categories.map((category) => (
+                  <div key={category.id} className="rounded-2xl border border-base-200 px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold truncate">{category.name}</div>
+                          <span className={`badge badge-xs ${category.is_active === false ? 'badge-ghost' : 'badge-success'}`}>
+                            {category.is_active === false ? 'Inactiva' : 'Activa'}
+                          </span>
+                        </div>
+                        <div className="text-sm text-base-content/60 mt-1">{category.description || 'Sin descripción'}</div>
+                      </div>
+                      {canUpdateCategories && (
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => openEditCategoryModal(category)}>
+                          Editar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-base-content/60">No hay categorías creadas para esta compañía.</p>
+            )
+          ) : (
+            <p className="text-base-content/60">No tienes permiso para listar categorías.</p>
+          )}
+        </section>
+      )}
+
+      {isCategoryModalOpen && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="text-lg font-bold">{editingCategory ? 'Editar categoría' : 'Nueva categoría'}</h3>
+            <p className="text-sm text-base-content/60 mt-1">
+              {editingCategory ? 'Actualiza los datos de la categoría.' : 'Crea una categoría para esta compañía.'}
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Nombre</span>
+                <input
+                  className="input input-bordered w-full"
+                  value={categoryForm.name}
+                  onChange={(event) => setCategoryForm((prev) => ({ ...prev, name: event.target.value }))}
+                  disabled={isSavingCategory}
+                />
+              </label>
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Descripción</span>
+                <textarea
+                  className="textarea textarea-bordered w-full"
+                  rows={3}
+                  value={categoryForm.description}
+                  onChange={(event) => setCategoryForm((prev) => ({ ...prev, description: event.target.value }))}
+                  disabled={isSavingCategory}
+                />
+              </label>
+              {editingCategory && (
+                <label className="flex items-center gap-2 rounded-xl border border-base-300 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-primary checkbox-sm"
+                    checked={categoryForm.is_active}
+                    onChange={(event) => setCategoryForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                    disabled={isSavingCategory}
+                  />
+                  <span className="text-sm">Categoría activa</span>
+                </label>
+              )}
+            </div>
+
+            <div className="modal-action">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setIsCategoryModalOpen(false);
+                  setEditingCategory(null);
+                }}
+                disabled={isSavingCategory}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveCategory}
+                disabled={!categoryForm.name.trim() || isSavingCategory}
+              >
+                {isSavingCategory ? 'Guardando...' : editingCategory ? 'Guardar cambios' : 'Crear categoría'}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => !isSavingCategory && setIsCategoryModalOpen(false)} />
+        </div>
+      )}
     </div>
   );
 };

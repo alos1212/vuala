@@ -1,5 +1,6 @@
 import type { Company } from './company';
 import type { User } from './auth';
+import type { ClientCategory } from './clientCategory';
 
 export interface ClientContact {
   id: number;
@@ -17,6 +18,9 @@ export interface Client {
   id: number;
   company_id: number;
   assigned_user_id?: number | null;
+  client_type?: 'person' | 'company' | null;
+  client_category_id?: number | null;
+  document_type?: string | null;
   name: string;
   tax_id?: string | null;
   email?: string | null;
@@ -29,6 +33,7 @@ export interface Client {
   is_active?: boolean;
   status?: number | string | null;
   company?: Company;
+  category?: ClientCategory | null;
   assignedUser?: Pick<User, 'id' | 'name' | 'email'> | null;
   contacts?: ClientContact[];
 }

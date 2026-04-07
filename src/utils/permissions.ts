@@ -32,6 +32,10 @@ export const PERMISSIONS = {
   CLIENTS_CREATE: 'clients.create',
   CLIENTS_UPDATE: 'clients.update',
   CLIENTS_DELETE: 'clients.delete',
+  CLIENTS_CATEGORIES_LIST: 'clients.categories.list',
+  CLIENTS_CATEGORIES_CREATE: 'clients.categories.create',
+  CLIENTS_CATEGORIES_UPDATE: 'clients.categories.update',
+  CLIENTS_CATEGORIES_DELETE: 'clients.categories.delete',
 
   // CRM
   CRM_ACTIVITIES_LIST: 'crm.activities.list',

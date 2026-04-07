@@ -37,12 +37,8 @@ import CrmTasksPage from "../pages/crm/CrmTasksPage"
 import CrmActivityFormPage from "../pages/crm/CrmActivityFormPage"
 
 const AppRouter: React.FC = () => {
-    const { isAuthenticated, hasPermission } = useAuthStore()
-    const authenticatedHome = hasPermission("companies.list")
-        ? "/companies"
-        : hasPermission("crm.activities.list")
-            ? "/crm"
-            : "/dashboard/home"
+    const { isAuthenticated } = useAuthStore()
+    const authenticatedHome = "/dashboard/home"
 
     return (
         <QueryClientProvider client={queryClient}>

@@ -76,7 +76,10 @@ const ClientDetailPage: React.FC = () => {
         <h2 className="text-xl font-semibold mb-4">Información general</h2>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div><div className="text-sm text-base-content/60">Compañía</div><div className="font-semibold">{client.company?.name || `#${client.company_id}`}</div></div>
-          <div><div className="text-sm text-base-content/60">NIT</div><div className="font-semibold">{client.tax_id || '-'}</div></div>
+          <div><div className="text-sm text-base-content/60">Tipo</div><div className="font-semibold">{client.client_type === 'person' ? 'Persona' : 'Empresa'}</div></div>
+          <div><div className="text-sm text-base-content/60">Categoría</div><div className="font-semibold">{client.category?.name || '-'}</div></div>
+          <div><div className="text-sm text-base-content/60">Tipo de documento</div><div className="font-semibold">{client.document_type || '-'}</div></div>
+          <div><div className="text-sm text-base-content/60">Número de documento</div><div className="font-semibold">{client.tax_id || '-'}</div></div>
           <div><div className="text-sm text-base-content/60">Correo</div><div className="font-semibold">{client.email || '-'}</div></div>
           <div><div className="text-sm text-base-content/60">Teléfono</div><div className="font-semibold">{client.phone || '-'}</div></div>
           <div><div className="text-sm text-base-content/60">País</div><div className="font-semibold">{countryName}</div></div>
@@ -93,13 +96,15 @@ const ClientDetailPage: React.FC = () => {
           <p className="text-sm text-base-content/60">Estos contactos no tienen acceso al sistema.</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <input className="input input-bordered" placeholder="Nombre" value={contactForm.name} onChange={(e) => setContactForm((prev) => ({ ...prev, name: e.target.value }))} />
-          <input className="input input-bordered" placeholder="Cargo" value={contactForm.position} onChange={(e) => setContactForm((prev) => ({ ...prev, position: e.target.value }))} />
-          <input className="input input-bordered" placeholder="Correo" value={contactForm.email} onChange={(e) => setContactForm((prev) => ({ ...prev, email: e.target.value }))} />
-          <input className="input input-bordered" placeholder="Teléfono" value={contactForm.phone} onChange={(e) => setContactForm((prev) => ({ ...prev, phone: e.target.value }))} />
-          <button className="btn btn-primary" onClick={handleCreateContact}>Agregar contacto</button>
-        </div>
+        {client.client_type !== 'person' && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <input className="input input-bordered" placeholder="Nombre" value={contactForm.name} onChange={(e) => setContactForm((prev) => ({ ...prev, name: e.target.value }))} />
+            <input className="input input-bordered" placeholder="Cargo" value={contactForm.position} onChange={(e) => setContactForm((prev) => ({ ...prev, position: e.target.value }))} />
+            <input className="input input-bordered" placeholder="Correo" value={contactForm.email} onChange={(e) => setContactForm((prev) => ({ ...prev, email: e.target.value }))} />
+            <input className="input input-bordered" placeholder="Teléfono" value={contactForm.phone} onChange={(e) => setContactForm((prev) => ({ ...prev, phone: e.target.value }))} />
+            <button className="btn btn-primary" onClick={handleCreateContact}>Agregar contacto</button>
+          </div>
+        )}
 
         {client.contacts && client.contacts.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -112,9 +117,11 @@ const ClientDetailPage: React.FC = () => {
                     <div className="text-sm">{contact.email || '-'}</div>
                     <div className="text-sm text-base-content/60">{contact.phone || '-'}</div>
                   </div>
-                  <button className="btn btn-ghost btn-sm text-error" onClick={() => handleDeleteContact(contact.id)}>
-                    Eliminar
-                  </button>
+                  {client.client_type !== 'person' && (
+                    <button className="btn btn-ghost btn-sm text-error" onClick={() => handleDeleteContact(contact.id)}>
+                      Eliminar
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -123,6 +130,7 @@ const ClientDetailPage: React.FC = () => {
           <p className="text-base-content/60">Este cliente todavía no tiene contactos registrados.</p>
         )}
       </section>
+
     </div>
   );
 };

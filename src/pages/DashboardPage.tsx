@@ -1,161 +1,143 @@
 import React from 'react';
-import {
-    BiUser,
-    BiGroup,
-    BiShield,
-    BiTrendingUp,
-    BiCheckCircle
-} from 'react-icons/bi';
-import { usePermissionCheck } from '../hooks/usePermissionCheck';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { BiBuilding, BiCheckCircle, BiGroup, BiTask, BiTrendingUp } from 'react-icons/bi';
 import { useAuth } from '../hooks/useAuth';
-
-import PermissionGuard from '../components/auth/PermissionGuard';
-import type { Role } from '../types/auth';
+import { useAuthStore } from '../stores/authStore';
+import { companyService } from '../services/companyService';
+import { clientService } from '../services/clientService';
+import { crmService } from '../services/crmService';
 
 const DashboardPage: React.FC = () => {
-    const { user } = useAuth();
- 
-    const {
-        canManageUsers,
-        isAdmin
-    } = usePermissionCheck();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const hasPermission = useAuthStore((state) => state.hasPermission);
+  const isCompanyUser = Boolean(user?.company_id);
+  const canSeeCompanies = !isCompanyUser && hasPermission('companies.list');
+  const canSeeClients = hasPermission('clients.list');
+  const canSeeCrm = hasPermission('crm.activities.list');
 
-    const stats = [
-        {
-            title: 'Usuarios',
-            value: '150',
-            icon: BiUser,
-            color: 'text-primary',
-            visible: canManageUsers(),
-        },
-        
-        {
-            title: 'Estado',
-            value: 'Activo',
-            icon: BiCheckCircle,
-            color: 'text-success',
-            visible: true,
-        },
-    ];
+  const { data: companiesData } = useQuery({
+    queryKey: ['dashboard-companies-count'],
+    queryFn: () => companyService.getCompanies({ per_page: 1 }),
+    enabled: canSeeCompanies,
+  });
 
-    return (
-        <div className="p-6">
-            {/* Welcome Section */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-base-content">
-                    ¡Bienvenido, {user?.name}!
-                </h1>
-                <p className="text-base-content/60 mt-1">
-                    Panel de administración del sistema
-                </p>
-                {isAdmin() && (
-                    <div className="alert alert-info mt-4">
-                        <BiShield className="w-6 h-6" />
-                        <span>Tienes permisos de administrador completo</span>
-                    </div>
-                )}
-            </div>
+  const { data: clientsData } = useQuery({
+    queryKey: ['dashboard-clients-count'],
+    queryFn: () => clientService.getClients({ per_page: 1 }),
+    enabled: canSeeClients,
+  });
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {stats
-                    .filter(stat => stat.visible)
-                    .map((stat, index) => (
-                        <div key={index} className="stat bg-base-100 shadow-lg rounded-lg">
-                            <div className="stat-figure">
-                                <stat.icon className={`w-8 h-8 ${stat.color}`} />
-                            </div>
-                            <div className="stat-title">{stat.title}</div>
-                            <div className={`stat-value ${stat.color}`}>
-                                {stat.value}
-                            </div>
-                            <div className="stat-desc">
-                                <BiTrendingUp className="inline w-4 h-4 mr-1" />
-                                Actualizado
-                            </div>
-                        </div>
-                    ))}
-            </div>
+  const { data: pendingActivitiesData } = useQuery({
+    queryKey: ['dashboard-pending-activities-count'],
+    queryFn: () => crmService.getActivities({ per_page: 200, status: 'pending' }),
+    enabled: canSeeCrm,
+  });
 
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <PermissionGuard permission="users.create">
-                    <div className="card bg-base-100 shadow-lg">
-                        <div className="card-body">
-                            <h2 className="card-title">
-                                <BiUser className="w-6 h-6 text-primary" />
-                                Gestión de Usuarios
-                            </h2>
-                            <p className="text-base-content/60">
-                                Administra usuarios del sistema, asigna roles y permisos
-                            </p>
-                            <div className="card-actions justify-end">
-                                <button className="btn btn-primary">
-                                    Gestionar Usuarios
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </PermissionGuard>
+  const companiesCount = companiesData?.meta?.total ?? 0;
+  const clientsCount = clientsData?.meta?.total ?? 0;
+  const pendingTasksCount = pendingActivitiesData?.meta?.total ?? pendingActivitiesData?.data?.length ?? 0;
+  const totalVisibleItems = companiesCount + clientsCount + pendingTasksCount;
 
-                <PermissionGuard permission="roles.create">
-                    <div className="card bg-base-100 shadow-lg">
-                        <div className="card-body">
-                            <h2 className="card-title">
-                                <BiGroup className="w-6 h-6 text-secondary" />
-                                Gestión de Roles
-                            </h2>
-                            <p className="text-base-content/60">
-                                Crea y administra roles, asigna permisos específicos
-                            </p>
-                            <div className="card-actions justify-end">
-                                <button className="btn btn-secondary">
-                                    Gestionar Roles
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </PermissionGuard>
-            </div>
+  const metricCards = [
+    {
+      title: 'Tareas pendientes',
+      value: pendingTasksCount,
+      icon: BiTask,
+      tone: 'from-amber-400/20 to-orange-500/15 text-orange-700',
+      visible: canSeeCrm,
+    },
+    {
+      title: 'Compañías',
+      value: companiesCount,
+      icon: BiBuilding,
+      tone: 'from-indigo-400/20 to-violet-500/15 text-indigo-700',
+      visible: canSeeCompanies,
+    },
+    {
+      title: 'Clientes',
+      value: clientsCount,
+      icon: BiGroup,
+      tone: 'from-cyan-400/20 to-blue-500/15 text-cyan-700',
+      visible: canSeeClients,
+    },
+  ].filter((card) => card.visible);
 
-            {/* User Info */}
-            <div className="mt-8">
-                <div className="card bg-base-100 shadow-lg">
-                    <div className="card-body">
-                        <h2 className="card-title">Tu Información</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <h3 className="font-semibold text-base-content/80">Roles Asignados</h3>
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                    {(Array.isArray(user?.role) ? user.role : [user?.role])
-                                        .filter((role): role is Role => role !== undefined && role !== null)
-                                        .map((role) => (
-                                            <div key={role.id} className="badge badge-primary">
-                                                {role.display_name}
-                                            </div>
-                                        ))}
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-base-content/80">Permisos Activos</h3>
-                                <div className="text-sm text-base-content/60 mt-2">
-                                    {(Array.isArray(user?.role) ? user.role : [user?.role])
-                                        .filter((role): role is Role => role !== undefined && role !== null)
-                                        .reduce((total, role) => total + (role.permissions?.length ?? 0), 0)} permisos
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-base-content/80">Último Acceso</h3>
-                                <div className="text-sm text-base-content/60 mt-2">
-                                    Ahora
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  const quickActions = [
+    {
+      title: 'Ir a compañías',
+      description: 'Administra compañías y sus usuarios internos.',
+      onClick: () => navigate('/companies'),
+      visible: canSeeCompanies,
+    },
+    {
+      title: 'Ir a clientes',
+      description: 'Consulta y gestiona los clientes registrados.',
+      onClick: () => navigate('/clients'),
+      visible: canSeeClients,
+    },
+    {
+      title: 'Ir a CRM',
+      description: 'Revisa y atiende gestiones pendientes.',
+      onClick: () => navigate('/crm/gestiones'),
+      visible: canSeeCrm,
+    },
+  ].filter((action) => action.visible);
+
+  return (
+    <div className="p-6 space-y-6">
+      <section className="rounded-[30px] border border-base-200 bg-gradient-to-r from-base-100 via-base-100 to-base-200/70 p-6 shadow">
+        <h1 className="text-3xl font-bold text-base-content">Bienvenido, {user?.name}</h1>
+        <p className="mt-2 text-base-content/70">
+          Este es un resumen rápido del estado actual del sistema y de tus módulos principales.
+        </p>
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-4 py-2 text-sm text-success">
+          <BiCheckCircle className="h-4 w-4" />
+          Sistema activo y listo para operar
         </div>
-    );
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {metricCards.map((card) => (
+          <article
+            key={card.title}
+            className={`rounded-3xl border border-base-200 bg-gradient-to-br ${card.tone} p-5 shadow-sm`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium text-base-content/70">{card.title}</div>
+              <card.icon className="h-6 w-6" />
+            </div>
+            <div className="mt-3 text-4xl font-bold text-base-content">{card.value}</div>
+            <div className="mt-2 flex items-center gap-1 text-xs text-base-content/60">
+              <BiTrendingUp className="h-4 w-4" />
+              Resumen actualizado
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow-sm">
+        <h2 className="text-xl font-semibold">Introducción rápida</h2>
+        <p className="mt-1 text-sm text-base-content/60">
+          Actualmente tienes {totalVisibleItems} elementos visibles entre tareas, compañías y clientes.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          {quickActions.map((action) => (
+            <button
+              key={action.title}
+              type="button"
+              className="rounded-2xl border border-base-200 bg-base-50 px-4 py-4 text-left transition hover:-translate-y-0.5 hover:bg-base-100 hover:shadow-md"
+              onClick={action.onClick}
+            >
+              <div className="font-semibold">{action.title}</div>
+              <div className="mt-1 text-sm text-base-content/60">{action.description}</div>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
 };
 
 export default DashboardPage;

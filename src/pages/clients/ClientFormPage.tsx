@@ -1,16 +1,37 @@
 import React from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
+import { BiPlus } from 'react-icons/bi';
 import { clientService } from '../../services/clientService';
 import { companyService } from '../../services/companyService';
 import { geoService } from '../../services/geoService';
+import { clientCategoryService } from '../../services/clientCategoryService';
 import type { Client } from '../../types/client';
 import SearchableSelect from '../../components/ui/SearchableSelect';
+import { useAuthStore } from '../../stores/authStore';
+
+const COMPANY_DOCUMENT_TYPES = [
+  { value: 'NIT', label: 'NIT' },
+  { value: 'RUT', label: 'RUT' },
+  { value: 'EIN', label: 'EIN' },
+  { value: 'TAX_ID', label: 'TAX ID' },
+];
+
+const PERSON_DOCUMENT_TYPES = [
+  { value: 'CC', label: 'CC - Cédula de Ciudadanía' },
+  { value: 'CE', label: 'CE - Cédula de Extranjería' },
+  { value: 'TI', label: 'TI - Tarjeta de Identidad' },
+  { value: 'RC', label: 'RC - Registro Civil' },
+  { value: 'PP', label: 'PP - Pasaporte' },
+  { value: 'PPT', label: 'PPT - Permiso por Protección Temporal' },
+  { value: 'DNI', label: 'DNI - Documento Nacional de Identidad' },
+];
 
 const ClientFormPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
@@ -28,6 +49,13 @@ const ClientFormPage: React.FC = () => {
     phone?: string;
     is_primary?: boolean;
   }>>([]);
+  const [newCategoryName, setNewCategoryName] = React.useState('');
+  const [newCategoryDescription, setNewCategoryDescription] = React.useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = React.useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = React.useState(false);
+  const hasPermission = useAuthStore((state) => state.hasPermission);
+  const canListClientCategories = hasPermission('clients.categories.list');
+  const canCreateClientCategories = hasPermission('clients.categories.create');
 
   const { data: companiesData } = useQuery({
     queryKey: ['companies-for-clients'],
@@ -44,6 +72,9 @@ const ClientFormPage: React.FC = () => {
   const { register, control, handleSubmit, reset, setValue, watch } = useForm<Partial<Client>>({
     values: client ?? {
       company_id: searchParams.get('company_id') ? Number(searchParams.get('company_id')) : undefined,
+      client_type: 'company',
+      client_category_id: undefined,
+      document_type: undefined,
       name: '',
       tax_id: '',
       email: '',
@@ -60,6 +91,10 @@ const ClientFormPage: React.FC = () => {
   const selectedCountryId = Number(watch('country_id')) || undefined;
   const selectedStateId = Number(watch('state_id')) || undefined;
   const selectedCityId = Number(watch('city_id')) || undefined;
+  const selectedCompanyId = Number(watch('company_id')) || undefined;
+  const selectedCategoryId = Number(watch('client_category_id')) || undefined;
+  const selectedClientType = watch('client_type') === 'person' ? 'person' : 'company';
+  const selectedDocumentType = (watch('document_type') || '') as string;
 
   const { data: countries = [] } = useQuery({
     queryKey: ['geo-countries'],
@@ -76,6 +111,12 @@ const ClientFormPage: React.FC = () => {
     queryKey: ['geo-cities', selectedStateId],
     queryFn: () => geoService.getCitiesByState(selectedStateId as number),
     enabled: Boolean(selectedStateId),
+  });
+
+  const { data: categories = [], refetch: refetchCategories } = useQuery({
+    queryKey: ['client-categories', selectedCompanyId],
+    queryFn: () => clientCategoryService.getCategories(selectedCompanyId),
+    enabled: Boolean(selectedCompanyId) && canListClientCategories,
   });
 
   React.useEffect(() => {
@@ -104,15 +145,53 @@ const ClientFormPage: React.FC = () => {
     }
   }, [cities, isCitiesFetched, selectedCityId, selectedStateId, setValue]);
 
+  React.useEffect(() => {
+    if (!selectedCompanyId) {
+      setValue('client_category_id', undefined);
+      return;
+    }
+
+    if (selectedCategoryId && !categories.some((category) => category.id === selectedCategoryId)) {
+      setValue('client_category_id', undefined);
+    }
+  }, [categories, selectedCategoryId, selectedCompanyId, setValue]);
+
+  React.useEffect(() => {
+    const allowedDocumentTypes = selectedClientType === 'person'
+      ? PERSON_DOCUMENT_TYPES.map((item) => item.value)
+      : COMPANY_DOCUMENT_TYPES.map((item) => item.value);
+
+    if (selectedDocumentType && !allowedDocumentTypes.includes(selectedDocumentType)) {
+      setValue('document_type', undefined);
+    }
+  }, [selectedClientType, selectedDocumentType, setValue]);
+
+  React.useEffect(() => {
+    if (selectedClientType === 'person') {
+      setPendingContacts([]);
+    }
+  }, [selectedClientType]);
+
+  React.useEffect(() => {
+    if (isCategoryModalOpen) {
+      setIsCategoryModalOpen(false);
+    }
+  }, [location.pathname]);
+
   const onSubmit = async (values: Partial<Client>) => {
     const normalizeGeoId = (value: unknown): number | undefined => {
       const parsed = Number(value);
       return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
     };
+    const normalizedClientType: NonNullable<Client['client_type']> =
+      values.client_type === 'person' ? 'person' : 'company';
 
-    const payload = {
+    const payload: Partial<Client> = {
       ...values,
       company_id: values.company_id ? Number(values.company_id) : undefined,
+      client_type: normalizedClientType,
+      client_category_id: normalizeGeoId(values.client_category_id),
+      document_type: values.document_type || undefined,
       country_id: normalizeGeoId(values.country_id),
       state_id: normalizeGeoId(values.state_id),
       city_id: normalizeGeoId(values.city_id),
@@ -128,7 +207,7 @@ const ClientFormPage: React.FC = () => {
 
     const created = await clientService.createClient(payload);
 
-    if (pendingContacts.length > 0) {
+    if (selectedClientType !== 'person' && pendingContacts.length > 0) {
       for (const contact of pendingContacts) {
         await clientService.createContact(created.id, contact);
       }
@@ -170,6 +249,26 @@ const ClientFormPage: React.FC = () => {
     setPendingContacts((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
 
+  const handleCreateCategory = async () => {
+    if (!selectedCompanyId || !newCategoryName.trim() || isCreatingCategory) return;
+
+    setIsCreatingCategory(true);
+    try {
+      const createdCategory = await clientCategoryService.createCategory({
+        company_id: selectedCompanyId,
+        name: newCategoryName.trim(),
+        description: newCategoryDescription.trim() || undefined,
+      });
+      await refetchCategories();
+      setValue('client_category_id', createdCategory.id);
+      setNewCategoryName('');
+      setNewCategoryDescription('');
+      setIsCategoryModalOpen(false);
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -177,7 +276,11 @@ const ClientFormPage: React.FC = () => {
           <h1 className="text-3xl font-bold">{isEdit ? 'Editar cliente' : 'Crear cliente'}</h1>
           <p className="text-base-content/60">Registra clientes y asígnalos a la compañía correspondiente.</p>
         </div>
-        <button className="btn btn-ghost" onClick={() => navigate(isEdit && id ? `/clients/${id}` : '/clients')}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => window.location.assign(isEdit && id ? `/clients/${id}` : '/clients')}
+        >
           Volver
         </button>
       </div>
@@ -200,13 +303,102 @@ const ClientFormPage: React.FC = () => {
               )}
             />
           </label>
+          <div className="form-control w-full">
+            <span className="label-text mb-2">Categoría del cliente</span>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                {canListClientCategories ? (
+                  <Controller
+                    control={control}
+                    name="client_category_id"
+                    render={({ field }) => (
+                      <SearchableSelect
+                        options={categories.map((category) => ({ value: category.id, label: category.name }))}
+                        value={field.value ?? null}
+                        onChange={(value) => field.onChange(value ?? undefined)}
+                        placeholder={selectedCompanyId ? 'Selecciona categoría' : 'Primero selecciona una compañía'}
+                        isDisabled={!selectedCompanyId}
+                        isClearable
+                      />
+                    )}
+                  />
+                ) : (
+                  <input
+                    className="input input-bordered w-full bg-base-200"
+                    value="Sin permiso para listar categorías"
+                    readOnly
+                    disabled
+                  />
+                )}
+              </div>
+              {canCreateClientCategories && (
+                <button
+                  type="button"
+                  className="btn btn-success btn-sm h-9 min-h-9 w-9 p-0 ml-1"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setIsCategoryModalOpen(true);
+                  }}
+                  disabled={!selectedCompanyId}
+                  title={!selectedCompanyId ? 'Primero selecciona una compañía' : 'Nueva categoría'}
+                >
+                  <BiPlus className="h-3.5 w-3.5 pointer-events-none" />
+                </button>
+              )}
+            </div>
+            {!canListClientCategories && (
+              <span className="mt-1 text-xs text-base-content/60">
+                No tienes el permiso `clients.categories.list`.
+              </span>
+            )}
+          </div>
+          <label className="form-control w-full">
+            <span className="label-text mb-2">Tipo de cliente</span>
+            <Controller
+              control={control}
+              name="client_type"
+              render={({ field }) => (
+                <SearchableSelect
+                  options={[
+                    { value: 'company', label: 'Empresa' },
+                    { value: 'person', label: 'Persona' },
+                  ]}
+                  value={field.value ?? 'company'}
+                  onChange={(value) => field.onChange(value === 'person' ? 'person' : 'company')}
+                  placeholder="Selecciona tipo"
+                  isClearable={false}
+                />
+              )}
+            />
+          </label>
           <label className="form-control w-full">
             <span className="label-text mb-2">Nombre</span>
             <input className="input input-bordered w-full" {...register('name', { required: true })} />
           </label>
           <label className="form-control w-full">
-            <span className="label-text mb-2">NIT</span>
-            <input className="input input-bordered w-full" {...register('tax_id')} />
+            <span className="label-text mb-2">Tipo de documento</span>
+            <Controller
+              control={control}
+              name="document_type"
+              render={({ field }) => (
+                <SearchableSelect
+                  options={selectedClientType === 'person' ? PERSON_DOCUMENT_TYPES : COMPANY_DOCUMENT_TYPES}
+                  value={field.value ?? null}
+                  onChange={(value) => field.onChange(value ?? undefined)}
+                  placeholder="Selecciona tipo de documento"
+                  isClearable
+                />
+              )}
+            />
+          </label>
+          <label className="form-control w-full">
+            <span className="label-text mb-2">Número de documento</span>
+            <input
+              className="input input-bordered w-full"
+              placeholder={selectedClientType === 'person' ? 'Número de documento personal' : 'Número de documento empresa'}
+              {...register('tax_id')}
+            />
           </label>
           <label className="form-control w-full">
             <span className="label-text mb-2">Correo</span>
@@ -280,71 +472,79 @@ const ClientFormPage: React.FC = () => {
           <div className="mt-6 rounded-2xl border border-base-200 bg-base-50 p-4">
             <div className="mb-3">
               <h3 className="text-lg font-semibold">Contactos iniciales</h3>
-              <p className="text-sm text-base-content/60">Puedes crear contactos del cliente en este mismo paso.</p>
+              <p className="text-sm text-base-content/60">
+                {selectedClientType === 'person'
+                  ? 'Para clientes tipo persona se creará automáticamente un único contacto con los mismos datos del cliente.'
+                  : 'Puedes crear contactos del cliente en este mismo paso.'}
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <input
-                className="input input-bordered w-full bg-base-100"
-                placeholder="Nombre del contacto"
-                value={newContact.name}
-                onChange={(e) => setNewContact((prev) => ({ ...prev, name: e.target.value }))}
-              />
-              <input
-                className="input input-bordered w-full bg-base-100"
-                placeholder="Cargo"
-                value={newContact.position}
-                onChange={(e) => setNewContact((prev) => ({ ...prev, position: e.target.value }))}
-              />
-              <input
-                className="input input-bordered w-full bg-base-100"
-                placeholder="Correo"
-                type="email"
-                value={newContact.email}
-                onChange={(e) => setNewContact((prev) => ({ ...prev, email: e.target.value }))}
-              />
-              <input
-                className="input input-bordered w-full bg-base-100"
-                placeholder="Teléfono"
-                value={newContact.phone}
-                onChange={(e) => setNewContact((prev) => ({ ...prev, phone: e.target.value }))}
-              />
-              <label className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-100 px-3">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-primary checkbox-sm"
-                  checked={newContact.is_primary}
-                  onChange={(e) => setNewContact((prev) => ({ ...prev, is_primary: e.target.checked }))}
-                />
-                <span className="text-sm">Principal</span>
-              </label>
-            </div>
+            {selectedClientType !== 'person' && (
+              <>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <input
+                    className="input input-bordered w-full bg-base-100"
+                    placeholder="Nombre del contacto"
+                    value={newContact.name}
+                    onChange={(e) => setNewContact((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                  <input
+                    className="input input-bordered w-full bg-base-100"
+                    placeholder="Cargo"
+                    value={newContact.position}
+                    onChange={(e) => setNewContact((prev) => ({ ...prev, position: e.target.value }))}
+                  />
+                  <input
+                    className="input input-bordered w-full bg-base-100"
+                    placeholder="Correo"
+                    type="email"
+                    value={newContact.email}
+                    onChange={(e) => setNewContact((prev) => ({ ...prev, email: e.target.value }))}
+                  />
+                  <input
+                    className="input input-bordered w-full bg-base-100"
+                    placeholder="Teléfono"
+                    value={newContact.phone}
+                    onChange={(e) => setNewContact((prev) => ({ ...prev, phone: e.target.value }))}
+                  />
+                  <label className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-100 px-3">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-primary checkbox-sm"
+                      checked={newContact.is_primary}
+                      onChange={(e) => setNewContact((prev) => ({ ...prev, is_primary: e.target.checked }))}
+                    />
+                    <span className="text-sm">Principal</span>
+                  </label>
+                </div>
 
-            <div className="mt-3 flex justify-end">
-              <button className="btn btn-outline btn-sm" type="button" onClick={addPendingContact}>
-                Agregar contacto
-              </button>
-            </div>
+                <div className="mt-3 flex justify-end">
+                  <button className="btn btn-outline btn-sm" type="button" onClick={addPendingContact}>
+                    Agregar contacto
+                  </button>
+                </div>
 
-            {pendingContacts.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {pendingContacts.map((contact, index) => (
-                  <div key={`${contact.name}-${index}`} className="flex items-center justify-between rounded-xl border border-base-200 bg-base-100 px-3 py-2">
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">
-                        {contact.name}
-                        {contact.is_primary ? <span className="ml-2 badge badge-primary badge-sm">Principal</span> : null}
+                {pendingContacts.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {pendingContacts.map((contact, index) => (
+                      <div key={`${contact.name}-${index}`} className="flex items-center justify-between rounded-xl border border-base-200 bg-base-100 px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">
+                            {contact.name}
+                            {contact.is_primary ? <span className="ml-2 badge badge-primary badge-sm">Principal</span> : null}
+                          </div>
+                          <div className="text-sm text-base-content/60 truncate">
+                            {[contact.position, contact.email, contact.phone].filter(Boolean).join(' · ') || 'Sin datos adicionales'}
+                          </div>
+                        </div>
+                        <button className="btn btn-ghost btn-sm text-error" type="button" onClick={() => removePendingContact(index)}>
+                          Quitar
+                        </button>
                       </div>
-                      <div className="text-sm text-base-content/60 truncate">
-                        {[contact.position, contact.email, contact.phone].filter(Boolean).join(' · ') || 'Sin datos adicionales'}
-                      </div>
-                    </div>
-                    <button className="btn btn-ghost btn-sm text-error" type="button" onClick={() => removePendingContact(index)}>
-                      Quitar
-                    </button>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -355,6 +555,57 @@ const ClientFormPage: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {isCategoryModalOpen && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="text-lg font-bold">Nueva categoría</h3>
+            <p className="text-sm text-base-content/60 mt-1">La categoría se creará para la compañía seleccionada.</p>
+
+            <div className="mt-4 space-y-3">
+              <input
+                className="input input-bordered w-full"
+                placeholder="Nombre de la categoría"
+                value={newCategoryName}
+                onChange={(event) => setNewCategoryName(event.target.value)}
+                disabled={isCreatingCategory}
+              />
+              <textarea
+                className="textarea textarea-bordered w-full"
+                placeholder="Descripción (opcional)"
+                rows={3}
+                value={newCategoryDescription}
+                onChange={(event) => setNewCategoryDescription(event.target.value)}
+                disabled={isCreatingCategory}
+              />
+            </div>
+
+            <div className="modal-action">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setIsCategoryModalOpen(false);
+                  setNewCategoryName('');
+                  setNewCategoryDescription('');
+                }}
+                disabled={isCreatingCategory}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleCreateCategory}
+                disabled={!selectedCompanyId || !newCategoryName.trim() || isCreatingCategory}
+              >
+                {isCreatingCategory ? 'Creando...' : 'Crear categoría'}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => !isCreatingCategory && setIsCategoryModalOpen(false)} />
+        </div>
+      )}
     </div>
   );
 };

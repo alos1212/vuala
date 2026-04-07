@@ -155,7 +155,11 @@ const CompanyFormPage: React.FC = () => {
             <h1 className="text-3xl font-bold">{isEdit ? 'Editar compañía' : 'Crear compañía'}</h1>
             <p className="text-base-content/60">Configura la información general y la identidad visual de la compañía.</p>
           </div>
-          <button className="btn btn-ghost" onClick={() => navigate(isEdit && id ? `/companies/${id}` : '/companies')}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => window.location.assign(isEdit && id ? `/companies/${id}` : '/companies')}
+          >
             Volver
           </button>
         </div>
