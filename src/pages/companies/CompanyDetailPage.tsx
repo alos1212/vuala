@@ -2,15 +2,18 @@ import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BiBuilding, BiEnvelope, BiHide, BiMap, BiPhone, BiShow, BiUser, BiUserPlus, BiPencil } from 'react-icons/bi';
+import { toast } from 'react-hot-toast';
 import { companyService } from '../../services/companyService';
 import { clientService } from '../../services/clientService';
 import { clientCategoryService } from '../../services/clientCategoryService';
+import { whatsappService } from '../../services/whatsappService';
 import { roleService } from '../../services/roleService';
 import { geoService } from '../../services/geoService';
 import { getCompanyLogo } from '../../utils/authHelpers';
 import SearchableSelect from '../../components/ui/SearchableSelect';
 import { useAuthStore } from '../../stores/authStore';
 import type { ClientCategory } from '../../types/clientCategory';
+import type { WhatsappMetaConfig } from '../../types/whatsapp';
 
 const getUserRoleId = (user: any): number | null => {
   if (Array.isArray(user?.role) && user.role.length > 0) {
@@ -51,12 +54,26 @@ const CompanyDetailPage: React.FC = () => {
   const [editingCategory, setEditingCategory] = React.useState<ClientCategory | null>(null);
   const [categoryForm, setCategoryForm] = React.useState({ name: '', description: '', is_active: true });
   const [isSavingCategory, setIsSavingCategory] = React.useState(false);
+  const [isSavingWhatsappConfig, setIsSavingWhatsappConfig] = React.useState(false);
+  const [whatsappConfigForm, setWhatsappConfigForm] = React.useState<WhatsappMetaConfig>({
+    is_configured: false,
+    business_account_id: '',
+    phone_number_id: '',
+    access_token: '',
+    verify_token: '',
+    app_id: '',
+    app_secret: '',
+    webhook_url: '',
+    is_active: true,
+  });
   const { id } = useParams<{ id: string }>();
   const companyId = Number(id);
   const hasPermission = useAuthStore((state) => state.hasPermission);
   const canListCategories = hasPermission('clients.categories.list');
   const canCreateCategories = hasPermission('clients.categories.create');
   const canUpdateCategories = hasPermission('clients.categories.update');
+  const canReadWhatsappConfig = hasPermission('crm.whatsapp.config.read');
+  const canUpdateWhatsappConfig = hasPermission('crm.whatsapp.config.update');
 
   const { data: company, isLoading } = useQuery({
     queryKey: ['company', companyId],
@@ -85,6 +102,11 @@ const CompanyDetailPage: React.FC = () => {
     queryFn: () => clientCategoryService.getCategories(companyId),
     enabled: Number.isFinite(companyId) && canListCategories,
   });
+  const { data: whatsappConfig } = useQuery({
+    queryKey: ['company-whatsapp-config', companyId],
+    queryFn: () => whatsappService.getMetaConfig(companyId),
+    enabled: Number.isFinite(companyId) && canReadWhatsappConfig,
+  });
 
   const clients = clientsData?.data ?? [];
   const companyRoles = roles.filter((role) => role.type === 1);
@@ -108,6 +130,21 @@ const CompanyDetailPage: React.FC = () => {
     queryFn: () => geoService.getCitiesByState(companyStateId as number),
     enabled: Boolean(companyStateId),
   });
+
+  React.useEffect(() => {
+    if (!whatsappConfig) return;
+    setWhatsappConfigForm({
+      is_configured: Boolean(whatsappConfig.is_configured),
+      business_account_id: whatsappConfig.business_account_id || '',
+      phone_number_id: whatsappConfig.phone_number_id || '',
+      access_token: whatsappConfig.access_token || '',
+      verify_token: whatsappConfig.verify_token || '',
+      app_id: whatsappConfig.app_id || '',
+      app_secret: whatsappConfig.app_secret || '',
+      webhook_url: whatsappConfig.webhook_url || '',
+      is_active: whatsappConfig.is_active ?? true,
+    });
+  }, [whatsappConfig]);
 
   const handleCreateUser = async () => {
     if (!Number.isFinite(companyId)) return;
@@ -222,6 +259,24 @@ const CompanyDetailPage: React.FC = () => {
       setCategoryForm({ name: '', description: '', is_active: true });
     } finally {
       setIsSavingCategory(false);
+    }
+  };
+
+  const handleSaveWhatsappConfig = async () => {
+    if (!Number.isFinite(companyId) || isSavingWhatsappConfig || !canUpdateWhatsappConfig) return;
+
+    setIsSavingWhatsappConfig(true);
+    try {
+      await whatsappService.saveMetaConfig({
+        company_id: companyId,
+        ...whatsappConfigForm,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['company-whatsapp-config', companyId] });
+      toast.success('Configuración WhatsApp guardada');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'No se pudo guardar la configuración WhatsApp');
+    } finally {
+      setIsSavingWhatsappConfig(false);
     }
   };
 
@@ -616,6 +671,120 @@ const CompanyDetailPage: React.FC = () => {
           ) : (
             <p className="text-base-content/60">No tienes permiso para listar categorías.</p>
           )}
+        </section>
+      )}
+
+      {canReadWhatsappConfig && (
+        <section className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold">Configuración WhatsApp (Meta)</h2>
+            <p className="text-sm text-base-content/60">
+              Define aquí las credenciales de esta compañía para habilitar el inbox de WhatsApp.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="form-control w-full">
+              <span className="label-text mb-2">Business Account ID</span>
+              <input
+                className="input input-bordered w-full"
+                value={whatsappConfigForm.business_account_id || ''}
+                onChange={(event) => setWhatsappConfigForm((prev) => ({ ...prev, business_account_id: event.target.value }))}
+                disabled={!canUpdateWhatsappConfig}
+              />
+            </label>
+            <label className="form-control w-full">
+              <span className="label-text mb-2">Phone Number ID</span>
+              <input
+                className="input input-bordered w-full"
+                value={whatsappConfigForm.phone_number_id || ''}
+                onChange={(event) => setWhatsappConfigForm((prev) => ({ ...prev, phone_number_id: event.target.value }))}
+                disabled={!canUpdateWhatsappConfig}
+              />
+            </label>
+            <label className="form-control w-full md:col-span-2">
+              <span className="label-text mb-2">Access Token</span>
+              <input
+                className="input input-bordered w-full"
+                type="password"
+                value={whatsappConfigForm.access_token || ''}
+                onChange={(event) => setWhatsappConfigForm((prev) => ({ ...prev, access_token: event.target.value }))}
+                disabled={!canUpdateWhatsappConfig}
+              />
+            </label>
+            <label className="form-control w-full">
+              <span className="label-text mb-2">Verify Token</span>
+              <input
+                className="input input-bordered w-full"
+                value={whatsappConfigForm.verify_token || ''}
+                onChange={(event) => setWhatsappConfigForm((prev) => ({ ...prev, verify_token: event.target.value }))}
+                disabled={!canUpdateWhatsappConfig}
+              />
+            </label>
+            <label className="form-control w-full">
+              <span className="label-text mb-2">App ID</span>
+              <input
+                className="input input-bordered w-full"
+                value={whatsappConfigForm.app_id || ''}
+                onChange={(event) => setWhatsappConfigForm((prev) => ({ ...prev, app_id: event.target.value }))}
+                disabled={!canUpdateWhatsappConfig}
+              />
+            </label>
+            <label className="form-control w-full">
+              <span className="label-text mb-2">App Secret</span>
+              <input
+                className="input input-bordered w-full"
+                type="password"
+                value={whatsappConfigForm.app_secret || ''}
+                onChange={(event) => setWhatsappConfigForm((prev) => ({ ...prev, app_secret: event.target.value }))}
+                disabled={!canUpdateWhatsappConfig}
+              />
+            </label>
+            <label className="form-control w-full">
+              <span className="label-text mb-2">Webhook URL</span>
+              <input
+                className="input input-bordered w-full"
+                value={whatsappConfigForm.webhook_url || ''}
+                readOnly
+                disabled
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label className="flex items-center gap-2 rounded-xl border border-base-300 px-3 py-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-primary checkbox-sm"
+                checked={Boolean(whatsappConfigForm.is_configured)}
+                onChange={(event) => setWhatsappConfigForm((prev) => ({ ...prev, is_configured: event.target.checked }))}
+                disabled={!canUpdateWhatsappConfig}
+              />
+              <span className="text-sm">Configuración completada</span>
+            </label>
+
+            <label className="flex items-center gap-2 rounded-xl border border-base-300 px-3 py-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-primary checkbox-sm"
+                checked={Boolean(whatsappConfigForm.is_active)}
+                onChange={(event) => setWhatsappConfigForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                disabled={!canUpdateWhatsappConfig}
+              />
+              <span className="text-sm">Integración activa</span>
+            </label>
+
+            {canUpdateWhatsappConfig && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveWhatsappConfig}
+                disabled={isSavingWhatsappConfig}
+              >
+                {isSavingWhatsappConfig ? 'Guardando...' : 'Guardar WhatsApp'}
+              </button>
+            )}
+          </div>
         </section>
       )}
 

@@ -58,6 +58,7 @@ const Sidebar: React.FC = () => {
             submenu: [
                 { name: 'Resumen CRM', path: '/crm', permission: 'crm.activities.list', exact: true },
                 { name: 'Gestiones', path: '/crm/gestiones', permission: 'crm.activities.list', exact: true },
+                { name: 'Inbox WhatsApp', path: '/crm/whatsapp', permission: 'crm.whatsapp.inbox', exact: true },
             ]
         },
         {

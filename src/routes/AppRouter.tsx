@@ -35,6 +35,7 @@ import ClientFormPage from "../pages/clients/ClientFormPage"
 import CrmDashboardPage from "../pages/crm/CrmDashboardPage"
 import CrmTasksPage from "../pages/crm/CrmTasksPage"
 import CrmActivityFormPage from "../pages/crm/CrmActivityFormPage"
+import CrmWhatsappInboxPage from "../pages/crm/CrmWhatsappInboxPage"
 
 const AppRouter: React.FC = () => {
     const { isAuthenticated } = useAuthStore()
@@ -210,6 +211,14 @@ const AppRouter: React.FC = () => {
                                 element={
                                     <ProtectedRoute permission="crm.activities.update">
                                         <CrmActivityFormPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="crm/whatsapp"
+                                element={
+                                    <ProtectedRoute permissionAny={["crm.whatsapp.inbox", "crm.activities.list"]}>
+                                        <CrmWhatsappInboxPage />
                                     </ProtectedRoute>
                                 }
                             />
