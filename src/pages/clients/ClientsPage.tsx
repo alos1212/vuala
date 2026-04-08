@@ -19,7 +19,8 @@ const ClientsPage: React.FC = () => {
   const user = useAuthStore((state) => state.user);
   const canCreateClients = hasPermission('clients.create');
   const canListCompanies = hasPermission('companies.list');
-  const userCompanyId = Number(user?.company_id) || undefined;
+  const userCompanyId = Number(user?.company_id ?? user?.company?.id) || undefined;
+  const isGlobalUser = !userCompanyId;
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -29,6 +30,7 @@ const ClientsPage: React.FC = () => {
   const [selectedCountryId, setSelectedCountryId] = useState<number | null>(null);
   const [selectedStateId, setSelectedStateId] = useState<number | null>(null);
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(userCompanyId ?? null);
   const [importSummary, setImportSummary] = useState<{
     total_rows: number;
     valid_rows: number;
@@ -43,11 +45,12 @@ const ClientsPage: React.FC = () => {
   const [importErrors, setImportErrors] = useState<string[]>([]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['clients', search, page, selectedCountryId, selectedStateId, selectedCityId],
+    queryKey: ['clients', search, page, selectedCompanyId, selectedCountryId, selectedStateId, selectedCityId],
     queryFn: () => clientService.getClients({
       search,
       page,
       per_page: 20,
+      company_id: isGlobalUser ? (selectedCompanyId ?? undefined) : userCompanyId,
       country_id: selectedCountryId ?? undefined,
       state_id: selectedStateId ?? undefined,
       city_id: selectedCityId ?? undefined,
@@ -93,7 +96,7 @@ const ClientsPage: React.FC = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [search, selectedCountryId, selectedStateId, selectedCityId]);
+  }, [search, selectedCompanyId, selectedCountryId, selectedStateId, selectedCityId]);
 
   useEffect(() => {
     if (!selectedCountryId) {
@@ -335,7 +338,19 @@ const ClientsPage: React.FC = () => {
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className={`mt-4 grid grid-cols-1 gap-4 ${isGlobalUser && canListCompanies ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+            {isGlobalUser && canListCompanies && (
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Compañía</span>
+                <SearchableSelect
+                  options={importCompanyOptions}
+                  value={selectedCompanyId}
+                  onChange={(value) => setSelectedCompanyId(value ? Number(value) : null)}
+                  placeholder="Todas las compañías"
+                  isClearable
+                />
+              </label>
+            )}
             <label className="form-control w-full">
               <span className="label-text mb-2">País</span>
               <SearchableSelect
@@ -382,7 +397,42 @@ const ClientsPage: React.FC = () => {
         <>
           {renderPagination('top')}
 
-          <div className="overflow-x-auto rounded-3xl border border-base-200 bg-base-100 shadow">
+          <div className="space-y-3 lg:hidden">
+            {clients.map((client) => (
+              <div key={client.id} className="rounded-2xl border border-base-200 bg-base-100 p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-base font-semibold">{client.name}</div>
+                    <div className="mt-1 text-xs text-base-content/70">
+                      {[client.document_type, client.tax_id].filter(Boolean).join(' ') || 'Sin documento'}
+                    </div>
+                  </div>
+                  <span className={`badge ${client.client_type === 'person' ? 'badge-info' : 'badge-secondary'}`}>
+                    {client.client_type === 'person' ? 'Persona' : 'Empresa'}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-2 text-sm">
+                  <div><span className="font-medium">Categoría:</span> {client.category?.name || '-'}</div>
+                  <div><span className="font-medium">Compañía:</span> {client.company?.name || `#${client.company_id}`}</div>
+                  <div><span className="font-medium">Asignado a:</span> {client.assignedUser?.name || '-'}</div>
+                  <div><span className="font-medium">Correo:</span> {client.email || '-'}</div>
+                  <div><span className="font-medium">Teléfono:</span> {client.phone || '-'}</div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button className="btn btn-outline btn-sm" onClick={() => navigate(`/clients/${client.id}`)}>
+                    <BiRightArrowAlt className="w-4 h-4" />
+                    Detalle
+                  </button>
+                  <button className="btn btn-outline btn-sm btn-error" onClick={() => handleDelete(client)}>
+                    <BiTrash className="w-4 h-4" />
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden rounded-3xl border border-base-200 bg-base-100 shadow lg:block">
             <table className="table">
               <thead>
                 <tr>
