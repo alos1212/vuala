@@ -79,6 +79,17 @@ const ClientsPage: React.FC = () => {
   const totalClients = data?.meta?.total ?? clients.length;
   const importCompanyOptions = (companiesData?.data ?? []).map((company) => ({ value: company.id, label: company.name }));
   const resolvedImportCompanyId = selectedImportCompanyId ?? userCompanyId ?? null;
+  const pageGroupSize = 10;
+  const halfWindow = Math.floor(pageGroupSize / 2);
+  let pageStart = Math.max(1, currentPage - halfWindow);
+  let pageEnd = Math.min(totalPages, pageStart + pageGroupSize - 1);
+  if (pageEnd - pageStart + 1 < pageGroupSize) {
+    pageStart = Math.max(1, pageEnd - pageGroupSize + 1);
+  }
+  const visiblePages = Array.from(
+    { length: Math.max(0, pageEnd - pageStart + 1) },
+    (_, index) => pageStart + index
+  );
 
   useEffect(() => {
     setPage(1);
@@ -219,6 +230,76 @@ const ClientsPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['clients'] });
   };
 
+  const renderPagination = (keyPrefix: string) => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex flex-col gap-3 rounded-2xl border border-base-200 bg-base-100 px-4 py-3 md:flex-row md:items-center md:justify-between">
+        <div className="text-sm text-base-content/70">
+          Página {currentPage} de {totalPages} · {totalClients} clientes
+        </div>
+        <div className="join flex-wrap">
+          <button
+            type="button"
+            className="btn btn-sm join-item"
+            disabled={currentPage <= 1}
+            onClick={() => setPage(1)}
+          >
+            «
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm join-item"
+            disabled={currentPage <= 1}
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+          >
+            Anterior
+          </button>
+
+          {pageStart > 1 && (
+            <button type="button" className="btn btn-sm join-item pointer-events-none">
+              ...
+            </button>
+          )}
+
+          {visiblePages.map((pageNumber) => (
+            <button
+              key={`${keyPrefix}-page-${pageNumber}`}
+              type="button"
+              className={`btn btn-sm join-item ${pageNumber === currentPage ? 'btn-primary' : ''}`}
+              onClick={() => setPage(pageNumber)}
+            >
+              {pageNumber}
+            </button>
+          ))}
+
+          {pageEnd < totalPages && (
+            <button type="button" className="btn btn-sm join-item pointer-events-none">
+              ...
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="btn btn-sm join-item"
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          >
+            Siguiente
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm join-item"
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage(totalPages)}
+          >
+            »
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -299,6 +380,8 @@ const ClientsPage: React.FC = () => {
         </div>
       ) : (
         <>
+          {renderPagination('top')}
+
           <div className="overflow-x-auto rounded-3xl border border-base-200 bg-base-100 shadow">
             <table className="table">
               <thead>
@@ -350,34 +433,7 @@ const ClientsPage: React.FC = () => {
             </table>
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex flex-col gap-3 rounded-2xl border border-base-200 bg-base-100 px-4 py-3 md:flex-row md:items-center md:justify-between">
-              <div className="text-sm text-base-content/70">
-                Página {currentPage} de {totalPages} · {totalClients} clientes
-              </div>
-              <div className="join">
-                <button
-                  type="button"
-                  className="btn btn-sm join-item"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                >
-                  Anterior
-                </button>
-                <button type="button" className="btn btn-sm join-item pointer-events-none">
-                  {currentPage}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm join-item"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                >
-                  Siguiente
-                </button>
-              </div>
-            </div>
-          )}
+          {renderPagination('bottom')}
         </>
       )}
 
