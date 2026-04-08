@@ -278,7 +278,6 @@ const CrmWhatsappInboxPage: React.FC = () => {
                       <span className="badge badge-primary badge-sm">{conversation.unread_count}</span>
                     )}
                   </div>
-                  <div className="mt-2 text-sm text-base-content/70 line-clamp-2">{conversation.last_message || 'Sin mensajes'}</div>
                 </button>
               ))}
             </div>

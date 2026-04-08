@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BiDownload, BiGroup, BiPlus, BiRightArrowAlt, BiSearch, BiTrash, BiUpload } from 'react-icons/bi';
@@ -28,6 +29,7 @@ const ClientsPage: React.FC = () => {
   const canListCompanies = hasPermission('companies.list');
   const userCompanyId = Number(user?.company_id) || undefined;
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedImportCompanyId, setSelectedImportCompanyId] = useState<number | null>(userCompanyId ?? null);
   const [isParsingFile, setIsParsingFile] = useState(false);
@@ -42,8 +44,8 @@ const ClientsPage: React.FC = () => {
   const [importErrors, setImportErrors] = useState<string[]>([]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['clients', search],
-    queryFn: () => clientService.getClients({ search, per_page: 100 }),
+    queryKey: ['clients', search, page],
+    queryFn: () => clientService.getClients({ search, page, per_page: 20 }),
   });
   const { data: companiesData } = useQuery({
     queryKey: ['companies-for-client-import'],
@@ -52,8 +54,15 @@ const ClientsPage: React.FC = () => {
   });
 
   const clients = data?.data ?? [];
+  const currentPage = data?.meta?.current_page ?? page;
+  const totalPages = data?.meta?.last_page ?? 1;
+  const totalClients = data?.meta?.total ?? clients.length;
   const importCompanyOptions = (companiesData?.data ?? []).map((company) => ({ value: company.id, label: company.name }));
   const resolvedImportCompanyId = selectedImportCompanyId ?? userCompanyId ?? null;
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const normalizeText = (value: unknown) => String(value ?? '').trim();
 
@@ -483,59 +492,90 @@ const ClientsPage: React.FC = () => {
           No hay clientes registrados.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-3xl border border-base-200 bg-base-100 shadow">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Tipo</th>
-                <th>Categoría</th>
-                <th>Documento</th>
-                <th>Compañía</th>
-                <th>Asignado a</th>
-                <th>Contacto</th>
-                <th className="text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.map((client) => (
-                <tr key={client.id}>
-                  <td className="font-semibold">{client.name}</td>
-                  <td>
-                    <span className={`badge ${client.client_type === 'person' ? 'badge-info' : 'badge-secondary'}`}>
-                      {client.client_type === 'person' ? 'Persona' : 'Empresa'}
-                    </span>
-                  </td>
-                  <td>{client.category?.name || '-'}</td>
-                  <td>{[client.document_type, client.tax_id].filter(Boolean).join(' ') || '-'}</td>
-                  <td>{client.company?.name || `#${client.company_id}`}</td>
-                  <td>{client.assignedUser?.name || '-'}</td>
-                  <td>
-                    <div className="text-sm">
-                      <div>{client.email || '-'}</div>
-                      <div className="text-base-content/60">{client.phone || '-'}</div>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex justify-end gap-2">
-                      <button className="btn btn-outline btn-sm" onClick={() => navigate(`/clients/${client.id}`)}>
-                        <BiRightArrowAlt className="w-4 h-4" />
-                        Detalle
-                      </button>
-                      <button className="btn btn-outline btn-sm btn-error" onClick={() => handleDelete(client)}>
-                        <BiTrash className="w-4 h-4" />
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
+        <>
+          <div className="overflow-x-auto rounded-3xl border border-base-200 bg-base-100 shadow">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Tipo</th>
+                  <th>Categoría</th>
+                  <th>Documento</th>
+                  <th>Compañía</th>
+                  <th>Asignado a</th>
+                  <th>Contacto</th>
+                  <th className="text-right">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {clients.map((client) => (
+                  <tr key={client.id}>
+                    <td className="font-semibold">{client.name}</td>
+                    <td>
+                      <span className={`badge ${client.client_type === 'person' ? 'badge-info' : 'badge-secondary'}`}>
+                        {client.client_type === 'person' ? 'Persona' : 'Empresa'}
+                      </span>
+                    </td>
+                    <td>{client.category?.name || '-'}</td>
+                    <td>{[client.document_type, client.tax_id].filter(Boolean).join(' ') || '-'}</td>
+                    <td>{client.company?.name || `#${client.company_id}`}</td>
+                    <td>{client.assignedUser?.name || '-'}</td>
+                    <td>
+                      <div className="text-sm">
+                        <div>{client.email || '-'}</div>
+                        <div className="text-base-content/60">{client.phone || '-'}</div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex justify-end gap-2">
+                        <button className="btn btn-outline btn-sm" onClick={() => navigate(`/clients/${client.id}`)}>
+                          <BiRightArrowAlt className="w-4 h-4" />
+                          Detalle
+                        </button>
+                        <button className="btn btn-outline btn-sm btn-error" onClick={() => handleDelete(client)}>
+                          <BiTrash className="w-4 h-4" />
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex flex-col gap-3 rounded-2xl border border-base-200 bg-base-100 px-4 py-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm text-base-content/70">
+                Página {currentPage} de {totalPages} · {totalClients} clientes
+              </div>
+              <div className="join">
+                <button
+                  type="button"
+                  className="btn btn-sm join-item"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                >
+                  Anterior
+                </button>
+                <button type="button" className="btn btn-sm join-item pointer-events-none">
+                  {currentPage}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm join-item"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {isImportModalOpen && (
+      {isImportModalOpen && typeof document !== 'undefined' && createPortal(
         <div className="modal modal-open">
           <div className="modal-box max-w-4xl">
             <h3 className="text-xl font-bold">Carga masiva de clientes</h3>
@@ -640,7 +680,8 @@ const ClientsPage: React.FC = () => {
             </div>
           </div>
           <div className="modal-backdrop" onClick={() => !isImporting && setIsImportModalOpen(false)} />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
