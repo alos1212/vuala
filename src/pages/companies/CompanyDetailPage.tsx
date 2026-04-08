@@ -318,7 +318,7 @@ const CompanyDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="app-page-header-actions">
             <button className="btn btn-ghost" onClick={() => navigate('/companies')}>Volver</button>
             <button className="btn btn-primary" onClick={() => navigate(`/companies/${company.id}/edit`)}>Editar</button>
           </div>

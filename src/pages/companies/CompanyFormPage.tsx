@@ -149,19 +149,21 @@ const CompanyFormPage: React.FC = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="rounded-[32px] border border-base-200 bg-gradient-to-r from-base-100 via-base-100 to-base-200/70 p-6 shadow">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="app-page-header">
           <div>
             <div className="badge badge-outline mb-3">{isEdit ? 'Edición' : 'Creación'}</div>
             <h1 className="text-3xl font-bold">{isEdit ? 'Editar compañía' : 'Crear compañía'}</h1>
             <p className="text-base-content/60">Configura la información general y la identidad visual de la compañía.</p>
           </div>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => window.location.assign(isEdit && id ? `/companies/${id}` : '/companies')}
-          >
-            Volver
-          </button>
+          <div className="app-page-header-actions">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => window.location.assign(isEdit && id ? `/companies/${id}` : '/companies')}
+            >
+              Volver
+            </button>
+          </div>
         </div>
       </div>
 

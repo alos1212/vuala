@@ -61,12 +61,12 @@ const ClientDetailPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="app-page-header">
         <div>
           <h1 className="text-3xl font-bold">{client.name}</h1>
           <p className="text-base-content/60">Detalle del cliente, sus contactos y datos comerciales.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="app-page-header-actions">
           <button className="btn btn-ghost" onClick={() => navigate('/clients')}>Volver</button>
           <button className="btn btn-primary" onClick={() => navigate(`/clients/${client.id}/edit`)}>Editar</button>
         </div>

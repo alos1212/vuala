@@ -31,7 +31,7 @@ const CompaniesPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="app-page-header">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <BiBuilding className="w-7 h-7 text-primary" />
@@ -39,10 +39,12 @@ const CompaniesPage: React.FC = () => {
           </h1>
           <p className="text-base-content/60">Administra las compañías que operan su propio CRM dentro del sistema.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/companies/create')}>
-          <BiPlus className="w-5 h-5" />
-          Nueva compañía
-        </button>
+        <div className="app-page-header-actions">
+          <button className="btn btn-primary" onClick={() => navigate('/companies/create')}>
+            <BiPlus className="w-5 h-5" />
+            Nueva compañía
+          </button>
+        </div>
       </div>
 
       <div className="card bg-base-100 shadow border border-base-200">

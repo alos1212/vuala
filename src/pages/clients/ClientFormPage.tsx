@@ -271,18 +271,20 @@ const ClientFormPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="app-page-header">
         <div>
           <h1 className="text-3xl font-bold">{isEdit ? 'Editar cliente' : 'Crear cliente'}</h1>
           <p className="text-base-content/60">Registra clientes y asígnalos a la compañía correspondiente.</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => window.location.assign(isEdit && id ? `/clients/${id}` : '/clients')}
-        >
-          Volver
-        </button>
+        <div className="app-page-header-actions">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => window.location.assign(isEdit && id ? `/clients/${id}` : '/clients')}
+          >
+            Volver
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow">

@@ -305,7 +305,7 @@ const ClientsPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="app-page-header">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <BiGroup className="w-7 h-7 text-primary" />
@@ -313,7 +313,7 @@ const ClientsPage: React.FC = () => {
           </h1>
           <p className="text-base-content/60">Gestiona los clientes de las compañías y sus datos de contacto.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="app-page-header-actions">
           {canCreateClients && (
             <button className="btn btn-outline" onClick={() => setIsImportModalOpen(true)}>
               <BiUpload className="w-5 h-5" />
