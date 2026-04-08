@@ -16,6 +16,10 @@ export const whatsappService = {
     return unwrap<WhatsappMessage[]>(response.data);
   },
 
+  async markConversationAsRead(conversationId: string, companyId?: number): Promise<void> {
+    await api.post(`/crm/whatsapp/conversations/${conversationId}/mark-read`, companyId ? { company_id: companyId } : {});
+  },
+
   async sendMessage(payload: { company_id?: number; conversation_id?: string; to?: string; message: string }): Promise<void> {
     await api.post('/crm/whatsapp/messages', payload);
   },

@@ -25,6 +25,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const [broadcastPhones, setBroadcastPhones] = React.useState('');
   const [broadcastMessage, setBroadcastMessage] = React.useState('');
   const [sendingBroadcast, setSendingBroadcast] = React.useState(false);
+  const [markingReadConversationId, setMarkingReadConversationId] = React.useState<string | null>(null);
 
   const resolvedCompanyId = selectedCompanyId ?? userCompanyId ?? null;
 
@@ -71,6 +72,24 @@ const CrmWhatsappInboxPage: React.FC = () => {
   }, [conversations, activeConversationId]);
 
   const activeConversation = conversations.find((item) => item.id === activeConversationId) ?? null;
+
+  React.useEffect(() => {
+    const markAsRead = async () => {
+      if (!resolvedCompanyId || !activeConversation) return;
+      if (Number(activeConversation.unread_count || 0) <= 0) return;
+      if (markingReadConversationId === activeConversation.id) return;
+
+      setMarkingReadConversationId(activeConversation.id);
+      try {
+        await whatsappService.markConversationAsRead(activeConversation.id, resolvedCompanyId);
+        await queryClient.invalidateQueries({ queryKey: ['whatsapp-conversations', resolvedCompanyId] });
+      } finally {
+        setMarkingReadConversationId(null);
+      }
+    };
+
+    void markAsRead();
+  }, [activeConversation, markingReadConversationId, queryClient, resolvedCompanyId]);
 
   const handleSendMessage = async () => {
     if (!messageDraft.trim() || !resolvedCompanyId || !activeConversation) return;
