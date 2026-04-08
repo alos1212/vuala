@@ -4,6 +4,32 @@ import type { Client, ClientContact } from '../types/client';
 
 const unwrap = <T>(payload: any): T => payload?.data ?? payload;
 
+const normalizePaginatedResponse = <T>(payload: any): PaginatedResponse<T> => {
+  const source = payload?.data?.meta || payload?.data?.current_page ? payload.data : payload;
+
+  if (source?.meta) {
+    return source as PaginatedResponse<T>;
+  }
+
+  return {
+    data: Array.isArray(source?.data) ? source.data : [],
+    meta: {
+      current_page: Number(source?.current_page) || 1,
+      last_page: Number(source?.last_page) || 1,
+      per_page: Number(source?.per_page) || 20,
+      total: Number(source?.total) || 0,
+      from: source?.from ?? undefined,
+      to: source?.to ?? undefined,
+    },
+    links: {
+      first: source?.first_page_url ?? '',
+      last: source?.last_page_url ?? '',
+      prev: source?.prev_page_url ?? null,
+      next: source?.next_page_url ?? null,
+    },
+  };
+};
+
 export const clientService = {
   async getClients(params?: {
     page?: number;
@@ -16,7 +42,7 @@ export const clientService = {
     city_id?: number;
   }): Promise<PaginatedResponse<Client>> {
     const response = await api.get('/clients', { params });
-    return response.data;
+    return normalizePaginatedResponse<Client>(response.data);
   },
 
   async getClient(id: number): Promise<Client> {
