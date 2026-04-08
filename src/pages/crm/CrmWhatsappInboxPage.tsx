@@ -9,7 +9,7 @@ import { whatsappService } from '../../services/whatsappService';
 import { useAuthStore } from '../../stores/authStore';
 
 const CrmWhatsappInboxPage: React.FC = () => {
-  const REALTIME_REFRESH_MS = 4000;
+  const REALTIME_REFRESH_MS = 1000;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
