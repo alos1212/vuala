@@ -26,6 +26,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const [broadcastMessage, setBroadcastMessage] = React.useState('');
   const [sendingBroadcast, setSendingBroadcast] = React.useState(false);
   const [markingReadConversationId, setMarkingReadConversationId] = React.useState<string | null>(null);
+  const messagesContainerRef = React.useRef<HTMLDivElement | null>(null);
 
   const resolvedCompanyId = selectedCompanyId ?? userCompanyId ?? null;
 
@@ -91,6 +92,13 @@ const CrmWhatsappInboxPage: React.FC = () => {
     void markAsRead();
   }, [activeConversation, markingReadConversationId, queryClient, resolvedCompanyId]);
 
+  React.useEffect(() => {
+    if (!activeConversationId) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+  }, [activeConversationId, messages]);
+
   const handleSendMessage = async () => {
     if (!messageDraft.trim() || !resolvedCompanyId || !activeConversation) return;
 
@@ -144,6 +152,13 @@ const CrmWhatsappInboxPage: React.FC = () => {
     } finally {
       setSendingBroadcast(false);
     }
+  };
+
+  const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (!activeConversationId || !messageDraft.trim() || sendingMessage) return;
+    void handleSendMessage();
   };
 
   const companyOptions = (companiesData?.data ?? []).map((company) => ({ value: company.id, label: company.name }));
@@ -255,7 +270,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex-1 overflow-auto space-y-3 pr-1">
+          <div ref={messagesContainerRef} className="flex-1 overflow-auto space-y-3 pr-1">
             {isMessagesLoading ? (
               <div className="py-10 text-center"><span className="loading loading-spinner loading-md" /></div>
             ) : messages.length === 0 ? (
@@ -287,6 +302,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
               placeholder="Escribe tu respuesta..."
               value={messageDraft}
               onChange={(event) => setMessageDraft(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
               disabled={!activeConversationId || sendingMessage}
             />
             <button
