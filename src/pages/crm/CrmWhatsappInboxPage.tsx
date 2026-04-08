@@ -9,6 +9,7 @@ import { whatsappService } from '../../services/whatsappService';
 import { useAuthStore } from '../../stores/authStore';
 
 const CrmWhatsappInboxPage: React.FC = () => {
+  const REALTIME_REFRESH_MS = 4000;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
@@ -37,6 +38,9 @@ const CrmWhatsappInboxPage: React.FC = () => {
     queryKey: ['whatsapp-conversations', resolvedCompanyId, searchConversation],
     queryFn: () => whatsappService.getConversations({ company_id: resolvedCompanyId ?? undefined, search: searchConversation || undefined }),
     enabled: Boolean(resolvedCompanyId),
+    refetchInterval: Boolean(resolvedCompanyId) ? REALTIME_REFRESH_MS : false,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     retry: false,
   });
 
@@ -44,6 +48,9 @@ const CrmWhatsappInboxPage: React.FC = () => {
     queryKey: ['whatsapp-messages', resolvedCompanyId, activeConversationId],
     queryFn: () => whatsappService.getConversationMessages(activeConversationId as string, resolvedCompanyId ?? undefined),
     enabled: Boolean(resolvedCompanyId) && Boolean(activeConversationId),
+    refetchInterval: Boolean(resolvedCompanyId) && Boolean(activeConversationId) ? REALTIME_REFRESH_MS : false,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     retry: false,
   });
 
