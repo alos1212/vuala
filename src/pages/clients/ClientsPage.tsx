@@ -397,7 +397,7 @@ const ClientsPage: React.FC = () => {
         <>
           {renderPagination('top')}
 
-          <div className="space-y-3 lg:hidden">
+          <div className="space-y-3 md:hidden">
             {clients.map((client) => (
               <div key={client.id} className="rounded-2xl border border-base-200 bg-base-100 p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -432,7 +432,7 @@ const ClientsPage: React.FC = () => {
             ))}
           </div>
 
-          <div className="hidden rounded-3xl border border-base-200 bg-base-100 shadow lg:block">
+          <div className="hidden rounded-3xl border border-base-200 bg-base-100 shadow md:block">
             <table className="table">
               <thead>
                 <tr>
