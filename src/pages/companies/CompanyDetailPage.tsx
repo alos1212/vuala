@@ -64,6 +64,15 @@ const CompanyDetailPage: React.FC = () => {
     app_id: '',
     app_secret: '',
     webhook_url: '',
+    default_template_name: '',
+    default_template_language: 'es_CO',
+    templates: [],
+    is_active: true,
+  });
+  const [newWhatsappTemplate, setNewWhatsappTemplate] = React.useState({
+    name: '',
+    language: 'es_CO',
+    label: '',
     is_active: true,
   });
   const { id } = useParams<{ id: string }>();
@@ -142,6 +151,9 @@ const CompanyDetailPage: React.FC = () => {
       app_id: whatsappConfig.app_id || '',
       app_secret: whatsappConfig.app_secret || '',
       webhook_url: whatsappConfig.webhook_url || '',
+      default_template_name: whatsappConfig.default_template_name || '',
+      default_template_language: whatsappConfig.default_template_language || 'es_CO',
+      templates: Array.isArray(whatsappConfig.templates) ? whatsappConfig.templates : [],
       is_active: whatsappConfig.is_active ?? true,
     });
   }, [whatsappConfig]);
@@ -278,6 +290,79 @@ const CompanyDetailPage: React.FC = () => {
     } finally {
       setIsSavingWhatsappConfig(false);
     }
+  };
+
+  const handleAddWhatsappTemplate = () => {
+    const name = newWhatsappTemplate.name.trim();
+    if (!name) return;
+
+    const language = (newWhatsappTemplate.language || 'es_CO').trim() || 'es_CO';
+    const label = newWhatsappTemplate.label.trim();
+    const nextTemplate = {
+      name,
+      language,
+      label: label || null,
+      is_active: Boolean(newWhatsappTemplate.is_active),
+    };
+
+    setWhatsappConfigForm((prev) => {
+      const templates = Array.isArray(prev.templates) ? prev.templates : [];
+      const exists = templates.some((template) => template.name === name && (template.language || 'es_CO') === language);
+      if (exists) return prev;
+
+      return {
+        ...prev,
+        templates: [...templates, nextTemplate],
+        default_template_name: prev.default_template_name || name,
+        default_template_language: prev.default_template_language || language,
+      };
+    });
+
+    setNewWhatsappTemplate({
+      name: '',
+      language: 'es_CO',
+      label: '',
+      is_active: true,
+    });
+  };
+
+  const handleRemoveWhatsappTemplate = (index: number) => {
+    setWhatsappConfigForm((prev) => {
+      const templates = Array.isArray(prev.templates) ? prev.templates : [];
+      const removed = templates[index];
+      const nextTemplates = templates.filter((_, currentIndex) => currentIndex !== index);
+
+      const wasDefault = removed &&
+        removed.name === (prev.default_template_name || '') &&
+        (removed.language || 'es_CO') === (prev.default_template_language || 'es_CO');
+
+      return {
+        ...prev,
+        templates: nextTemplates,
+        default_template_name: wasDefault ? (nextTemplates[0]?.name || '') : (prev.default_template_name || ''),
+        default_template_language: wasDefault ? (nextTemplates[0]?.language || 'es_CO') : (prev.default_template_language || 'es_CO'),
+      };
+    });
+  };
+
+  const handleSetDefaultWhatsappTemplate = (name: string, language?: string | null) => {
+    setWhatsappConfigForm((prev) => ({
+      ...prev,
+      default_template_name: name,
+      default_template_language: (language || 'es_CO'),
+    }));
+  };
+
+  const handleToggleTemplateActive = (index: number, isActive: boolean) => {
+    setWhatsappConfigForm((prev) => {
+      const templates = Array.isArray(prev.templates) ? prev.templates : [];
+      return {
+        ...prev,
+        templates: templates.map((template, currentIndex) =>
+          currentIndex === index ? { ...template, is_active: isActive } : template
+        ),
+      };
+    });
   };
 
   if (isLoading || !company) {
@@ -749,6 +834,116 @@ const CompanyDetailPage: React.FC = () => {
                 disabled
               />
             </label>
+          </div>
+
+          <div className="rounded-2xl border border-base-200 p-4 space-y-4">
+            <div>
+              <h3 className="text-base font-semibold">Plantillas por compañía</h3>
+              <p className="text-sm text-base-content/60">
+                Configura aquí las plantillas de Meta disponibles para esta compañía y marca una como predeterminada.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <label className="form-control w-full md:col-span-2">
+                <span className="label-text mb-2">Nombre plantilla (Meta)</span>
+                <input
+                  className="input input-bordered w-full"
+                  placeholder="vualacrm_primer_contacto"
+                  value={newWhatsappTemplate.name}
+                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, name: event.target.value }))}
+                  disabled={!canUpdateWhatsappConfig}
+                />
+              </label>
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Idioma</span>
+                <input
+                  className="input input-bordered w-full"
+                  placeholder="es_CO"
+                  value={newWhatsappTemplate.language}
+                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, language: event.target.value }))}
+                  disabled={!canUpdateWhatsappConfig}
+                />
+              </label>
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Etiqueta opcional</span>
+                <input
+                  className="input input-bordered w-full"
+                  placeholder="Primer contacto"
+                  value={newWhatsappTemplate.label}
+                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, label: event.target.value }))}
+                  disabled={!canUpdateWhatsappConfig}
+                />
+              </label>
+            </div>
+
+            {canUpdateWhatsappConfig && (
+              <div>
+                <button type="button" className="btn btn-outline btn-sm" onClick={handleAddWhatsappTemplate}>
+                  Agregar plantilla
+                </button>
+              </div>
+            )}
+
+            {Array.isArray(whatsappConfigForm.templates) && whatsappConfigForm.templates.length > 0 ? (
+              <div className="space-y-2">
+                {whatsappConfigForm.templates.map((template, index) => {
+                  const isDefault =
+                    template.name === (whatsappConfigForm.default_template_name || '') &&
+                    (template.language || 'es_CO') === (whatsappConfigForm.default_template_language || 'es_CO');
+
+                  return (
+                    <div key={`${template.name}-${template.language || 'es_CO'}-${index}`} className="rounded-xl border border-base-200 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="font-semibold">{template.label || template.name}</div>
+                          <div className="text-xs text-base-content/60">
+                            {template.name} · {(template.language || 'es_CO')}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`badge ${isDefault ? 'badge-primary' : 'badge-ghost'}`}>
+                            {isDefault ? 'Predeterminada' : 'Disponible'}
+                          </span>
+                          <label className="flex items-center gap-1 text-xs">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-xs"
+                              checked={template.is_active !== false}
+                              onChange={(event) => handleToggleTemplateActive(index, event.target.checked)}
+                              disabled={!canUpdateWhatsappConfig}
+                            />
+                            Activa
+                          </label>
+                          {canUpdateWhatsappConfig && !isDefault && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs"
+                              onClick={() => handleSetDefaultWhatsappTemplate(template.name, template.language)}
+                            >
+                              Marcar predeterminada
+                            </button>
+                          )}
+                          {canUpdateWhatsappConfig && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs text-error"
+                              onClick={() => handleRemoveWhatsappTemplate(index)}
+                            >
+                              Eliminar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-base-content/60">
+                No hay plantillas configuradas todavía para esta compañía.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">

@@ -37,6 +37,14 @@ export interface WhatsappMetaConfig {
   app_id?: string | null;
   app_secret?: string | null;
   webhook_url?: string | null;
+  default_template_name?: string | null;
+  default_template_language?: string | null;
+  templates?: Array<{
+    name: string;
+    language?: string | null;
+    label?: string | null;
+    is_active?: boolean;
+  }>;
   updated_at?: string | null;
 }
 
