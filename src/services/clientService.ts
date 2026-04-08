@@ -20,6 +20,30 @@ export const clientService = {
     return unwrap<Client>(response.data);
   },
 
+  async importClients(file: File, companyId?: number): Promise<{
+    total_rows: number;
+    valid_rows: number;
+    consolidated_rows: number;
+    skipped_by_format: number;
+    created_clients: number;
+    reused_clients: number;
+    created_contacts: number;
+    skipped_existing_contacts: number;
+    errors: string[];
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (companyId) {
+      formData.append('company_id', String(companyId));
+    }
+
+    const response = await api.post('/clients/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    return unwrap(response.data);
+  },
+
   async updateClient(id: number, payload: Partial<Client>): Promise<Client> {
     const response = await api.put<ApiResponse<Client>>(`/clients/${id}`, payload);
     return unwrap<Client>(response.data);
