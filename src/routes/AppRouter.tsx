@@ -16,6 +16,7 @@ import LoginPage from "../pages/auth/LoginPage"
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage"
 import DashboardPage from "../pages/DashboardPage"
 import DashboardLandingPage from "../pages/DashboardLandingPage"
+import PrivacyPolicyPage from "../pages/PrivacyPolicyPage"
 import ProfilePage from "../pages/profile/ProfilePage"
 import UsersPage from "../pages/users/UsersPage"
 import UserProfilePage from "../pages/users/UserProfilePage"
@@ -63,6 +64,8 @@ const AppRouter: React.FC = () => {
                                 element={isAuthenticated ? <Navigate to={authenticatedHome} replace /> : <ResetPasswordPage />}
                             />
                         </Route>
+                        <Route path="/politica-de-privacidad" element={<PrivacyPolicyPage />} />
+                        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
                         {/* Rutas protegidas */}
                         <Route
