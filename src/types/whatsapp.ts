@@ -1,11 +1,21 @@
 export interface WhatsappConversation {
   id: string;
+  client_id?: number | null;
   contact_name?: string | null;
   contact_phone?: string | null;
   last_message?: string | null;
   last_message_at?: string | null;
   unread_count?: number;
   status?: 'open' | 'pending' | 'closed' | string;
+  client?: {
+    id: number;
+    name: string;
+    client_type?: 'person' | 'company' | null;
+    company?: {
+      id?: number;
+      name?: string;
+    } | null;
+  } | null;
 }
 
 export interface WhatsappMessage {

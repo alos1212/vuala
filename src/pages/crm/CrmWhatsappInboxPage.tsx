@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BiCheckCircle, BiSend, BiTask, BiTime } from 'react-icons/bi';
+import { FaWhatsapp } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../../components/ui/SearchableSelect';
@@ -73,6 +74,12 @@ const CrmWhatsappInboxPage: React.FC = () => {
   }, [conversations, activeConversationId]);
 
   const activeConversation = conversations.find((item) => item.id === activeConversationId) ?? null;
+  const activeClientType = activeConversation?.client?.client_type;
+  const activeClientLabel = activeClientType === 'person'
+    ? 'Persona'
+    : activeClientType === 'company'
+      ? `Empresa: ${activeConversation?.client?.name || 'Sin nombre'}`
+      : 'Contacto WhatsApp';
 
   React.useEffect(() => {
     const markAsRead = async () => {
@@ -245,9 +252,27 @@ const CrmWhatsappInboxPage: React.FC = () => {
                   onClick={() => setActiveConversationId(conversation.id)}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-semibold truncate">{conversation.contact_name || conversation.contact_phone || 'Sin nombre'}</div>
-                      <div className="text-xs text-base-content/60 truncate">{conversation.contact_phone || 'Sin teléfono'}</div>
+                    <div className="flex min-w-0 items-start gap-2">
+                      <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-green-100 text-green-600">
+                        <FaWhatsapp className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold truncate">{conversation.contact_name || conversation.contact_phone || 'Sin nombre'}</div>
+                        <div className="text-xs text-base-content/60 truncate">{conversation.contact_phone || 'Sin teléfono'}</div>
+                        <div className="mt-1">
+                          {conversation.client?.client_type === 'person' && (
+                            <span className="badge badge-info badge-xs">Persona</span>
+                          )}
+                          {conversation.client?.client_type === 'company' && (
+                            <span className="badge badge-secondary badge-xs">
+                              Empresa: {conversation.client?.name || 'Sin nombre'}
+                            </span>
+                          )}
+                          {!conversation.client?.client_type && (
+                            <span className="badge badge-ghost badge-xs">Contacto</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     {Number(conversation.unread_count || 0) > 0 && (
                       <span className="badge badge-primary badge-sm">{conversation.unread_count}</span>
@@ -262,12 +287,22 @@ const CrmWhatsappInboxPage: React.FC = () => {
 
         <div className="rounded-3xl border border-base-200 bg-base-100 p-4 shadow h-[560px] flex flex-col">
           <div className="border-b border-base-200 pb-3 mb-3">
-            <h2 className="text-lg font-semibold">
-              {activeConversation?.contact_name || activeConversation?.contact_phone || 'Selecciona un chat'}
-            </h2>
-            <p className="text-sm text-base-content/60">
-              {activeConversation?.contact_phone || 'No hay conversación activa'}
-            </p>
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600">
+                <FaWhatsapp className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {activeConversation?.contact_name || activeConversation?.contact_phone || 'Selecciona un chat'}
+                </h2>
+                <p className="text-sm text-base-content/60">
+                  {activeConversation?.contact_phone || 'No hay conversación activa'}
+                </p>
+                {activeConversation && (
+                  <p className="mt-1 text-xs text-base-content/70">{activeClientLabel}</p>
+                )}
+              </div>
+            </div>
           </div>
 
           <div ref={messagesContainerRef} className="flex-1 overflow-auto space-y-3 pr-1">
