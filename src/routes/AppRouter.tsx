@@ -65,6 +65,9 @@ const AppRouter: React.FC = () => {
                             />
                         </Route>
                         <Route path="/politica-de-privacidad" element={<PrivacyPolicyPage />} />
+                        <Route path="/politicas-de-privacidad" element={<PrivacyPolicyPage />} />
+                        <Route path="/politica-privacidad" element={<PrivacyPolicyPage />} />
+                        <Route path="/privacy" element={<PrivacyPolicyPage />} />
                         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
                         {/* Rutas protegidas */}
