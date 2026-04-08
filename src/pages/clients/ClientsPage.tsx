@@ -6,6 +6,7 @@ import { BiDownload, BiGroup, BiPlus, BiRightArrowAlt, BiSearch, BiTrash, BiUplo
 import * as XLSX from 'xlsx';
 import { clientService } from '../../services/clientService';
 import { companyService } from '../../services/companyService';
+import { geoService } from '../../services/geoService';
 import type { Client } from '../../types/client';
 import SearchableSelect from '../../components/ui/SearchableSelect';
 import { useAuthStore } from '../../stores/authStore';
@@ -25,6 +26,9 @@ const ClientsPage: React.FC = () => {
   const [selectedImportCompanyId, setSelectedImportCompanyId] = useState<number | null>(userCompanyId ?? null);
   const [isImporting, setIsImporting] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [selectedCountryId, setSelectedCountryId] = useState<number | null>(null);
+  const [selectedStateId, setSelectedStateId] = useState<number | null>(null);
+  const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
   const [importSummary, setImportSummary] = useState<{
     total_rows: number;
     valid_rows: number;
@@ -39,8 +43,29 @@ const ClientsPage: React.FC = () => {
   const [importErrors, setImportErrors] = useState<string[]>([]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['clients', search, page],
-    queryFn: () => clientService.getClients({ search, page, per_page: 20 }),
+    queryKey: ['clients', search, page, selectedCountryId, selectedStateId, selectedCityId],
+    queryFn: () => clientService.getClients({
+      search,
+      page,
+      per_page: 20,
+      country_id: selectedCountryId ?? undefined,
+      state_id: selectedStateId ?? undefined,
+      city_id: selectedCityId ?? undefined,
+    }),
+  });
+  const { data: countries = [] } = useQuery({
+    queryKey: ['geo-countries'],
+    queryFn: geoService.getCountries,
+  });
+  const { data: states = [], isFetched: isStatesFetched } = useQuery({
+    queryKey: ['geo-states', selectedCountryId],
+    queryFn: () => geoService.getStatesByCountry(selectedCountryId as number),
+    enabled: Boolean(selectedCountryId),
+  });
+  const { data: cities = [], isFetched: isCitiesFetched } = useQuery({
+    queryKey: ['geo-cities', selectedStateId],
+    queryFn: () => geoService.getCitiesByState(selectedStateId as number),
+    enabled: Boolean(selectedStateId),
   });
   const { data: companiesData } = useQuery({
     queryKey: ['companies-for-client-import'],
@@ -57,7 +82,31 @@ const ClientsPage: React.FC = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, selectedCountryId, selectedStateId, selectedCityId]);
+
+  useEffect(() => {
+    if (!selectedCountryId) {
+      setSelectedStateId(null);
+      setSelectedCityId(null);
+      return;
+    }
+
+    if (isStatesFetched && selectedStateId && !states.some((state) => state.id === selectedStateId)) {
+      setSelectedStateId(null);
+      setSelectedCityId(null);
+    }
+  }, [isStatesFetched, selectedCountryId, selectedStateId, states]);
+
+  useEffect(() => {
+    if (!selectedStateId) {
+      setSelectedCityId(null);
+      return;
+    }
+
+    if (isCitiesFetched && selectedCityId && !cities.some((city) => city.id === selectedCityId)) {
+      setSelectedCityId(null);
+    }
+  }, [cities, isCitiesFetched, selectedCityId, selectedStateId]);
 
   const downloadTemplate = () => {
     const templateRows = [
@@ -204,6 +253,40 @@ const ClientsPage: React.FC = () => {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <label className="form-control w-full">
+              <span className="label-text mb-2">País</span>
+              <SearchableSelect
+                options={countries.map((country) => ({ value: country.id, label: country.name }))}
+                value={selectedCountryId}
+                onChange={(value) => setSelectedCountryId(value ? Number(value) : null)}
+                placeholder="Todos los países"
+                isClearable
+              />
+            </label>
+            <label className="form-control w-full">
+              <span className="label-text mb-2">Estado</span>
+              <SearchableSelect
+                options={states.map((state) => ({ value: state.id, label: state.name }))}
+                value={selectedStateId}
+                onChange={(value) => setSelectedStateId(value ? Number(value) : null)}
+                placeholder={selectedCountryId ? 'Todos los estados' : 'Primero selecciona un país'}
+                isDisabled={!selectedCountryId}
+                isClearable
+              />
+            </label>
+            <label className="form-control w-full">
+              <span className="label-text mb-2">Ciudad</span>
+              <SearchableSelect
+                options={cities.map((city) => ({ value: city.id, label: city.name }))}
+                value={selectedCityId}
+                onChange={(value) => setSelectedCityId(value ? Number(value) : null)}
+                placeholder={selectedStateId ? 'Todas las ciudades' : 'Primero selecciona un estado'}
+                isDisabled={!selectedStateId}
+                isClearable
+              />
+            </label>
           </div>
         </div>
       </div>

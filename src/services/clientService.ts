@@ -5,7 +5,16 @@ import type { Client, ClientContact } from '../types/client';
 const unwrap = <T>(payload: any): T => payload?.data ?? payload;
 
 export const clientService = {
-  async getClients(params?: { page?: number; per_page?: number; search?: string; company_id?: number; assigned_user_id?: number }): Promise<PaginatedResponse<Client>> {
+  async getClients(params?: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    company_id?: number;
+    assigned_user_id?: number;
+    country_id?: number;
+    state_id?: number;
+    city_id?: number;
+  }): Promise<PaginatedResponse<Client>> {
     const response = await api.get('/clients', { params });
     return response.data;
   },
