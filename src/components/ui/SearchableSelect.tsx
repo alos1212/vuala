@@ -13,6 +13,9 @@ interface SearchableSelectProps {
   placeholder?: string;
   isDisabled?: boolean;
   isClearable?: boolean;
+  inputValue?: string;
+  onInputChange?: (value: string) => void;
+  isLoading?: boolean;
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -22,6 +25,9 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   placeholder = 'Selecciona una opción',
   isDisabled = false,
   isClearable = true,
+  inputValue,
+  onInputChange,
+  isLoading = false,
 }) => {
   const selectedOption = options.find((option) => option.value === value) ?? null;
 
@@ -34,8 +40,19 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       isDisabled={isDisabled}
       isClearable={isClearable}
       isSearchable
+      inputValue={inputValue}
+      onInputChange={(nextValue, meta) => {
+        if (!onInputChange) return;
+        if (meta.action === 'input-change') {
+          onInputChange(nextValue);
+        }
+        if (meta.action === 'menu-close') {
+          onInputChange(nextValue);
+        }
+      }}
+      isLoading={isLoading}
       classNamePrefix="rs"
-      noOptionsMessage={() => 'Sin resultados'}
+      noOptionsMessage={() => (isLoading ? 'Buscando...' : 'Sin resultados')}
       styles={{
         control: (base, state) => ({
           ...base,

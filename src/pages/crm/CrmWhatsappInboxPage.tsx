@@ -131,7 +131,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
     return () => window.clearTimeout(timeout);
   }, [broadcastClientSearch]);
 
-  const { data: clientsData } = useQuery({
+  const { data: clientsData, isFetching: isClientsLoading } = useQuery({
     queryKey: ['clients-for-whatsapp-broadcast', resolvedCompanyId, debouncedBroadcastClientSearch],
     queryFn: () =>
       clientService.getClients({
@@ -994,25 +994,18 @@ const CrmWhatsappInboxPage: React.FC = () => {
                   {isClientFilterMode && (
                     <div className="space-y-3">
                       <label className="form-control w-full">
-                        <span className="label-text mb-2">Buscar empresa/cliente</span>
-                        <input
-                          className="input input-bordered w-full"
-                          value={broadcastClientSearch}
-                          onChange={(event) => setBroadcastClientSearch(event.target.value)}
-                          placeholder="Escribe nombre, correo, NIT o teléfono"
-                        />
-                        <span className="mt-1 text-xs text-base-content/60">
-                          Se muestran resultados mientras escribes.
-                        </span>
-                      </label>
-
-                      <label className="form-control w-full">
-                        <span className="label-text mb-2">Selecciona empresa/cliente</span>
+                        <span className="label-text mb-2">Empresa/cliente (busca escribiendo)</span>
                         <SearchableSelect
                           options={clientOptions}
                           value={selectedBroadcastClientId}
-                          onChange={(value) => setSelectedBroadcastClientId(value ? Number(value) : null)}
-                          placeholder="Selecciona un cliente"
+                          onChange={(value) => {
+                            setSelectedBroadcastClientId(value ? Number(value) : null);
+                            setBroadcastClientSearch('');
+                          }}
+                          inputValue={broadcastClientSearch}
+                          onInputChange={(value) => setBroadcastClientSearch(value)}
+                          isLoading={isClientsLoading}
+                          placeholder="Escribe nombre, correo, NIT o teléfono"
                           isClearable
                         />
                       </label>
