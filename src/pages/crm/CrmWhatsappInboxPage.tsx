@@ -40,6 +40,8 @@ const CrmWhatsappInboxPage: React.FC = () => {
     '',
     '',
   ]);
+  const [chatVariableSources, setChatVariableSources] = React.useState<string[]>([]);
+  const [broadcastVariableSources, setBroadcastVariableSources] = React.useState<string[]>([]);
   const [selectedBroadcastClientId, setSelectedBroadcastClientId] = React.useState<number | null>(null);
   const [includeClientContacts, setIncludeClientContacts] = React.useState(true);
   const [broadcastCountryId, setBroadcastCountryId] = React.useState<number | null>(null);
@@ -82,6 +84,38 @@ const CrmWhatsappInboxPage: React.FC = () => {
     queryKey: ['whatsapp-meta-config', resolvedCompanyId],
     queryFn: () => whatsappService.getMetaConfig(resolvedCompanyId ?? undefined),
     enabled: Boolean(resolvedCompanyId),
+    retry: false,
+  });
+
+  const parseTemplateKey = (key: string | null): { name: string; language: string } | null => {
+    if (!key) return null;
+    const [name = '', language = 'es_CO'] = key.split('::');
+    if (!name) return null;
+    return { name, language: language || 'es_CO' };
+  };
+
+  const chatTemplateSelection = parseTemplateKey(selectedTemplateKey);
+  const broadcastTemplateSelection = parseTemplateKey(broadcastTemplateKey);
+
+  const { data: chatTemplatePreview } = useQuery({
+    queryKey: ['whatsapp-template-preview-chat', resolvedCompanyId, chatTemplateSelection?.name, chatTemplateSelection?.language],
+    queryFn: () => whatsappService.getTemplatePreview({
+      company_id: resolvedCompanyId ?? undefined,
+      template_name: chatTemplateSelection?.name || '',
+      template_language: chatTemplateSelection?.language || 'es_CO',
+    }),
+    enabled: sendMode === 'template' && Boolean(resolvedCompanyId) && Boolean(chatTemplateSelection?.name),
+    retry: false,
+  });
+
+  const { data: broadcastTemplatePreview } = useQuery({
+    queryKey: ['whatsapp-template-preview-broadcast', resolvedCompanyId, broadcastTemplateSelection?.name, broadcastTemplateSelection?.language],
+    queryFn: () => whatsappService.getTemplatePreview({
+      company_id: resolvedCompanyId ?? undefined,
+      template_name: broadcastTemplateSelection?.name || '',
+      template_language: broadcastTemplateSelection?.language || 'es_CO',
+    }),
+    enabled: broadcastSendMode === 'template' && Boolean(resolvedCompanyId) && Boolean(broadcastTemplateSelection?.name),
     retry: false,
   });
 
@@ -223,6 +257,59 @@ const CrmWhatsappInboxPage: React.FC = () => {
     });
   }, [clientsData?.data, selectedBroadcastClientId]);
 
+  const selectedCompanyName = (companiesData?.data ?? []).find((item) => item.id === resolvedCompanyId)?.name || '';
+  const selectedBroadcastClient = (clientsData?.data ?? []).find((item) => item.id === selectedBroadcastClientId);
+  const selectedCountryName = countries.find((item) => item.id === broadcastCountryId)?.name || '';
+  const selectedStateName = states.find((item) => item.id === broadcastStateId)?.name || '';
+  const selectedCityName = cities.find((item) => item.id === broadcastCityId)?.name || '';
+
+  React.useEffect(() => {
+    const indexes = chatTemplatePreview?.variable_indexes ?? [];
+    if (indexes.length === 0) return;
+
+    setTemplateVariables((prev) =>
+      indexes.map((index) => prev[index - 1] ?? (index === 1 ? (activeConversation?.contact_name || activeConversation?.client?.name || '') : ''))
+    );
+    setChatVariableSources((prev) => indexes.map((_, index) => prev[index] ?? 'manual'));
+  }, [chatTemplatePreview?.variable_indexes, activeConversation?.contact_name, activeConversation?.client?.name]);
+
+  React.useEffect(() => {
+    const indexes = broadcastTemplatePreview?.variable_indexes ?? [];
+    if (indexes.length === 0) return;
+
+    setBroadcastTemplateVariables((prev) =>
+      indexes.map((index) => prev[index - 1] ?? (index === 1 ? (selectedBroadcastClient?.name || user?.name || '') : ''))
+    );
+    setBroadcastVariableSources((prev) => indexes.map((_, index) => prev[index] ?? 'manual'));
+  }, [broadcastTemplatePreview?.variable_indexes, selectedBroadcastClient?.name, user?.name]);
+
+  const resolveSourceValue = (mode: 'chat' | 'broadcast', source: string): string => {
+    if (mode === 'chat') {
+      if (source === 'contact_name') return activeConversation?.contact_name || activeConversation?.client?.name || '';
+      if (source === 'company_name') return activeConversation?.client?.company?.name || selectedCompanyName;
+      if (source === 'country') return selectedCountryName;
+      if (source === 'state') return selectedStateName;
+      if (source === 'city') return selectedCityName;
+      return '';
+    }
+
+    if (source === 'contact_name') return selectedBroadcastClient?.name || '';
+    if (source === 'company_name') return selectedCompanyName;
+    if (source === 'country') return selectedCountryName;
+    if (source === 'state') return selectedStateName;
+    if (source === 'city') return selectedCityName;
+    return '';
+  };
+
+  const templateSourceOptions = [
+    { value: 'manual', label: 'Manual' },
+    { value: 'contact_name', label: 'Nombre contacto' },
+    { value: 'company_name', label: 'Nombre empresa' },
+    { value: 'country', label: 'País' },
+    { value: 'state', label: 'Estado' },
+    { value: 'city', label: 'Ciudad' },
+  ];
+
   const handleSendMessage = async () => {
     if (!resolvedCompanyId || !activeConversation) return;
     if (sendMode === 'text' && !messageDraft.trim()) return;
@@ -258,11 +345,9 @@ const CrmWhatsappInboxPage: React.FC = () => {
       });
       setMessageDraft('');
       if (sendMode === 'template') {
-        setTemplateVariables(() => {
-          const next = ['', '', '', '', ''];
-          next[0] = activeConversation?.contact_name || activeConversation?.client?.name || '';
-          return next;
-        });
+        setTemplateVariables((prev) =>
+          prev.map((_, index) => (index === 0 ? (activeConversation?.contact_name || activeConversation?.client?.name || '') : ''))
+        );
       }
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', resolvedCompanyId, activeConversation.id] });
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-conversations', resolvedCompanyId] });
@@ -345,7 +430,9 @@ const CrmWhatsappInboxPage: React.FC = () => {
       await whatsappService.sendBroadcast(payload);
       setBroadcastMessage('');
       setBroadcastPhones('');
-      setBroadcastTemplateVariables([user?.name || '', '', '', '', '']);
+      setBroadcastTemplateVariables((prev) =>
+        prev.map((_, index) => (index === 0 ? (selectedBroadcastClient?.name || user?.name || '') : ''))
+      );
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-conversations', resolvedCompanyId] });
       toast.success('Envío ejecutado correctamente');
     } catch (error: any) {
@@ -368,32 +455,14 @@ const CrmWhatsappInboxPage: React.FC = () => {
       value: client.id,
       label: `${client.name}${client.phone ? ` · ${client.phone}` : ''}`,
     }));
-  const extractTemplateBody = (template: {
-    body?: string;
-    components?: Array<{ type?: string | null; text?: string | null }>;
-  }): string => {
-    if (template.body?.trim()) return template.body.trim();
-    const bodyComponent = (template.components || []).find((component) => String(component?.type || '').toUpperCase() === 'BODY');
-    if (bodyComponent?.text?.trim()) return bodyComponent.text.trim();
-    return '';
-  };
-
-  const buildTemplatePreview = (templateKey: string | null, values: string[]) => {
+  const buildTemplatePreview = (templateKey: string | null, values: string[], bodyText?: string) => {
     if (!templateKey) return 'Selecciona una plantilla para ver la vista previa.';
-    const selected = availableTemplates.find((template) => `${template.name}::${template.language}` === templateKey);
-
-    if (!selected) return 'No se encontró la plantilla seleccionada.';
-
-    const templateBody = extractTemplateBody(selected);
-    if (!templateBody) {
-      const nonEmptyValues = values.map((value) => value.trim()).filter(Boolean);
-      if (nonEmptyValues.length > 0) {
-        return nonEmptyValues.join(' | ');
-      }
-      return selected.label || 'Mensaje automático';
+    if (!bodyText?.trim()) {
+      const selected = availableTemplates.find((template) => `${template.name}::${template.language}` === templateKey);
+      return selected?.label || 'Mensaje automático';
     }
 
-    return templateBody.replace(/\{\{\s*(\d+)\s*\}\}/g, (_match, indexText: string) => {
+    return bodyText.replace(/\{\{\s*(\d+)\s*\}\}/g, (_match, indexText: string) => {
       const variableIndex = Number(indexText) - 1;
       const resolvedValue = values[variableIndex]?.trim();
       return resolvedValue || `{{${indexText}}}`;
@@ -648,22 +717,47 @@ const CrmWhatsappInboxPage: React.FC = () => {
                             />
                           </label>
 
-                          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                            {templateVariables.map((value, index) => (
-                              <label key={`template-var-${index}`} className="form-control w-full">
-                                <span className="label-text mb-1 text-xs">Variable {`{{${index + 1}}}`}</span>
-                                <input
-                                  className="input input-bordered w-full"
-                                  placeholder={index === 0 ? 'Nombre del contacto' : `Valor para {{${index + 1}}}`}
-                                  value={value}
-                                  onChange={(event) => {
-                                    const nextValues = [...templateVariables];
-                                    nextValues[index] = event.target.value;
-                                    setTemplateVariables(nextValues);
-                                  }}
-                                  disabled={!activeConversationId || sendingMessage}
-                                />
-                              </label>
+                          <div className="grid grid-cols-1 gap-2">
+                            {(chatTemplatePreview?.variable_indexes ?? []).map((variableNumber, index) => (
+                              <div key={`template-var-${variableNumber}`} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_220px]">
+                                <label className="form-control w-full">
+                                  <span className="label-text mb-1 text-xs">Variable {`{{${variableNumber}}}`}</span>
+                                  <input
+                                    className="input input-bordered w-full"
+                                    placeholder={variableNumber === 1 ? 'Nombre del contacto' : `Valor para {{${variableNumber}}}`}
+                                    value={templateVariables[variableNumber - 1] ?? ''}
+                                    onChange={(event) => {
+                                      const nextValues = [...templateVariables];
+                                      nextValues[variableNumber - 1] = event.target.value;
+                                      setTemplateVariables(nextValues);
+                                    }}
+                                    disabled={!activeConversationId || sendingMessage}
+                                  />
+                                </label>
+                                <label className="form-control w-full">
+                                  <span className="label-text mb-1 text-xs">Cargar desde</span>
+                                  <SearchableSelect
+                                    options={templateSourceOptions}
+                                    value={chatVariableSources[index] || 'manual'}
+                                    onChange={(value) => {
+                                      const source = String(value || 'manual');
+                                      setChatVariableSources((prev) => {
+                                        const next = [...prev];
+                                        next[index] = source;
+                                        return next;
+                                      });
+                                      if (source !== 'manual') {
+                                        const nextValues = [...templateVariables];
+                                        nextValues[variableNumber - 1] = resolveSourceValue('chat', source);
+                                        setTemplateVariables(nextValues);
+                                      }
+                                    }}
+                                    placeholder="Manual"
+                                    isDisabled={!activeConversationId || sendingMessage}
+                                    isClearable={false}
+                                  />
+                                </label>
+                              </div>
                             ))}
                           </div>
                           <p className="text-xs text-base-content/60">
@@ -671,7 +765,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
                           </p>
                           <div className="rounded-xl border border-base-200 bg-base-50 px-3 py-2 text-sm">
                             <div className="text-xs text-base-content/60 mb-1">Vista previa</div>
-                            <div className="whitespace-pre-wrap">{buildTemplatePreview(selectedTemplateKey, templateVariables)}</div>
+                            <div className="whitespace-pre-wrap">{buildTemplatePreview(selectedTemplateKey, templateVariables, chatTemplatePreview?.body_text)}</div>
                           </div>
                         </div>
                       ) : (
@@ -754,27 +848,52 @@ const CrmWhatsappInboxPage: React.FC = () => {
                           isClearable={false}
                         />
                       </label>
-                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                        {broadcastTemplateVariables.map((value, index) => (
-                          <label key={`broadcast-template-var-${index}`} className="form-control w-full">
-                            <span className="label-text mb-1 text-xs">Variable {`{{${index + 1}}}`}</span>
-                            <input
-                              className="input input-bordered w-full"
-                              placeholder={index === 0 ? 'Nombre (por defecto)' : `Valor para {{${index + 1}}}`}
-                              value={value}
-                              onChange={(event) => {
-                                const next = [...broadcastTemplateVariables];
-                                next[index] = event.target.value;
-                                setBroadcastTemplateVariables(next);
-                              }}
-                              disabled={sendingBroadcast}
-                            />
-                          </label>
+                      <div className="grid grid-cols-1 gap-2">
+                        {(broadcastTemplatePreview?.variable_indexes ?? []).map((variableNumber, index) => (
+                          <div key={`broadcast-template-var-${variableNumber}`} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_220px]">
+                            <label className="form-control w-full">
+                              <span className="label-text mb-1 text-xs">Variable {`{{${variableNumber}}}`}</span>
+                              <input
+                                className="input input-bordered w-full"
+                                placeholder={variableNumber === 1 ? 'Nombre (por defecto)' : `Valor para {{${variableNumber}}}`}
+                                value={broadcastTemplateVariables[variableNumber - 1] ?? ''}
+                                onChange={(event) => {
+                                  const next = [...broadcastTemplateVariables];
+                                  next[variableNumber - 1] = event.target.value;
+                                  setBroadcastTemplateVariables(next);
+                                }}
+                                disabled={sendingBroadcast}
+                              />
+                            </label>
+                            <label className="form-control w-full">
+                              <span className="label-text mb-1 text-xs">Cargar desde</span>
+                              <SearchableSelect
+                                options={templateSourceOptions}
+                                value={broadcastVariableSources[index] || 'manual'}
+                                onChange={(value) => {
+                                  const source = String(value || 'manual');
+                                  setBroadcastVariableSources((prev) => {
+                                    const next = [...prev];
+                                    next[index] = source;
+                                    return next;
+                                  });
+                                  if (source !== 'manual') {
+                                    const nextValues = [...broadcastTemplateVariables];
+                                    nextValues[variableNumber - 1] = resolveSourceValue('broadcast', source);
+                                    setBroadcastTemplateVariables(nextValues);
+                                  }
+                                }}
+                                placeholder="Manual"
+                                isDisabled={sendingBroadcast}
+                                isClearable={false}
+                              />
+                            </label>
+                          </div>
                         ))}
                       </div>
                       <div className="rounded-xl border border-base-200 bg-base-50 px-3 py-2 text-sm">
                         <div className="text-xs text-base-content/60 mb-1">Vista previa</div>
-                        <div className="whitespace-pre-wrap">{buildTemplatePreview(broadcastTemplateKey, broadcastTemplateVariables)}</div>
+                        <div className="whitespace-pre-wrap">{buildTemplatePreview(broadcastTemplateKey, broadcastTemplateVariables, broadcastTemplatePreview?.body_text)}</div>
                       </div>
                     </div>
                   ) : (

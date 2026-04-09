@@ -67,3 +67,17 @@ export interface WhatsappBroadcastPayload {
   city_id?: number;
   include_client_contacts?: boolean;
 }
+
+export interface WhatsappTemplatePreview {
+  name: string;
+  language: string;
+  status?: string;
+  category?: string;
+  body_text: string;
+  variable_indexes: number[];
+  variable_count: number;
+  components?: Array<{
+    type?: string | null;
+    text?: string | null;
+  }>;
+}
