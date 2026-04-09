@@ -56,6 +56,7 @@ const CompanyDetailPage: React.FC = () => {
   const [isSavingCategory, setIsSavingCategory] = React.useState(false);
   const [isSavingWhatsappConfig, setIsSavingWhatsappConfig] = React.useState(false);
   const [isCreatingWhatsappTemplate, setIsCreatingWhatsappTemplate] = React.useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = React.useState(false);
   const [whatsappConfigForm, setWhatsappConfigForm] = React.useState<WhatsappMetaConfig>({
     is_configured: false,
     business_account_id: '',
@@ -297,43 +298,6 @@ const CompanyDetailPage: React.FC = () => {
     }
   };
 
-  const handleAddWhatsappTemplate = () => {
-    const name = newWhatsappTemplate.name.trim();
-    if (!name) return;
-
-    const language = (newWhatsappTemplate.language || 'es_CO').trim() || 'es_CO';
-    const label = newWhatsappTemplate.label.trim();
-    const nextTemplate = {
-      name,
-      language,
-      label: label || null,
-      is_active: Boolean(newWhatsappTemplate.is_active),
-    };
-
-    setWhatsappConfigForm((prev) => {
-      const templates = Array.isArray(prev.templates) ? prev.templates : [];
-      const exists = templates.some((template) => template.name === name && (template.language || 'es_CO') === language);
-      if (exists) return prev;
-
-      return {
-        ...prev,
-        templates: [...templates, nextTemplate],
-        default_template_name: prev.default_template_name || name,
-        default_template_language: prev.default_template_language || language,
-      };
-    });
-
-    setNewWhatsappTemplate({
-      name: '',
-      language: 'es_CO',
-      category: 'MARKETING',
-      body_text: '',
-      example_values_text: '',
-      label: '',
-      is_active: true,
-    });
-  };
-
   const handleCreateWhatsappTemplateInMeta = async () => {
     if (!Number.isFinite(companyId) || !canUpdateWhatsappConfig || isCreatingWhatsappTemplate) return;
 
@@ -410,6 +374,7 @@ const CompanyDetailPage: React.FC = () => {
         example_values_text: '',
         label: '',
       }));
+      setIsTemplateModalOpen(false);
     } catch (error: any) {
       const apiMessage = error?.response?.data?.message;
       const metaReason = error?.response?.data?.errors?.meta?.[0];
@@ -931,92 +896,14 @@ const CompanyDetailPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-              <label className="form-control w-full md:col-span-2">
-                <span className="label-text mb-2">Nombre plantilla (Meta)</span>
-                <input
-                  className="input input-bordered w-full"
-                  placeholder="vualacrm_primer_contacto"
-                  value={newWhatsappTemplate.name}
-                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, name: event.target.value }))}
-                  disabled={!canUpdateWhatsappConfig}
-                />
-              </label>
-              <label className="form-control w-full">
-                <span className="label-text mb-2">Idioma</span>
-                <input
-                  className="input input-bordered w-full"
-                  placeholder="es_CO"
-                  value={newWhatsappTemplate.language}
-                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, language: event.target.value }))}
-                  disabled={!canUpdateWhatsappConfig}
-                />
-              </label>
-              <label className="form-control w-full">
-                <span className="label-text mb-2">Categoría Meta</span>
-                <SearchableSelect
-                  options={[
-                    { value: 'MARKETING', label: 'MARKETING' },
-                    { value: 'UTILITY', label: 'UTILITY' },
-                    { value: 'AUTHENTICATION', label: 'AUTHENTICATION' },
-                  ]}
-                  value={newWhatsappTemplate.category}
-                  onChange={(value) => setNewWhatsappTemplate((prev) => ({ ...prev, category: String(value || 'MARKETING') as 'MARKETING' | 'UTILITY' | 'AUTHENTICATION' }))}
-                  isClearable={false}
-                  isDisabled={!canUpdateWhatsappConfig}
-                />
-              </label>
-              <label className="form-control w-full">
-                <span className="label-text mb-2">Etiqueta opcional</span>
-                <input
-                  className="input input-bordered w-full"
-                  placeholder="Primer contacto"
-                  value={newWhatsappTemplate.label}
-                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, label: event.target.value }))}
-                  disabled={!canUpdateWhatsappConfig}
-                />
-              </label>
-              <label className="form-control w-full md:col-span-4">
-                <span className="label-text mb-2">Body de plantilla (Meta)</span>
-                <textarea
-                  className="textarea textarea-bordered w-full"
-                  rows={4}
-                  placeholder={'Hola {{1}}, te damos la bienvenida a VualaCRM'}
-                  value={newWhatsappTemplate.body_text}
-                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, body_text: event.target.value }))}
-                  disabled={!canUpdateWhatsappConfig}
-                />
-                <span className="mt-1 text-xs text-base-content/60">
-                  Usa variables como {`{{1}}`} o {`{{2}}`} si la plantilla las necesita.
-                </span>
-              </label>
-              <label className="form-control w-full md:col-span-4">
-                <span className="label-text mb-2">Ejemplos para variables (opcional)</span>
-                <input
-                  className="input input-bordered w-full"
-                  placeholder="Carlos, Bogotá (separado por coma)"
-                  value={newWhatsappTemplate.example_values_text}
-                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, example_values_text: event.target.value }))}
-                  disabled={!canUpdateWhatsappConfig}
-                />
-                <span className="mt-1 text-xs text-base-content/60">
-                  Si el body tiene variables, agrega ejemplos en orden para que Meta valide.
-                </span>
-              </label>
-            </div>
-
             {canUpdateWhatsappConfig && (
               <div className="flex flex-wrap items-center gap-2">
-                <button type="button" className="btn btn-outline btn-sm" onClick={handleAddWhatsappTemplate}>
-                  Agregar local
-                </button>
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  onClick={handleCreateWhatsappTemplateInMeta}
-                  disabled={isCreatingWhatsappTemplate}
+                  onClick={() => setIsTemplateModalOpen(true)}
                 >
-                  {isCreatingWhatsappTemplate ? 'Creando en Meta...' : 'Crear en Meta'}
+                  Crear
                 </button>
               </div>
             )}
@@ -1117,6 +1004,112 @@ const CompanyDetailPage: React.FC = () => {
             )}
           </div>
         </section>
+      )}
+
+      {isTemplateModalOpen && (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-3xl">
+            <h3 className="text-lg font-bold">Crear plantilla en Meta</h3>
+            <p className="text-sm text-base-content/60 mt-1">
+              Crea la plantilla desde el sistema y la asocia automáticamente a la compañía.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+              <label className="form-control w-full md:col-span-2">
+                <span className="label-text mb-2">Nombre plantilla (Meta)</span>
+                <input
+                  className="input input-bordered w-full"
+                  placeholder="vualacrm_primer_contacto"
+                  value={newWhatsappTemplate.name}
+                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, name: event.target.value }))}
+                  disabled={isCreatingWhatsappTemplate}
+                />
+              </label>
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Idioma</span>
+                <input
+                  className="input input-bordered w-full"
+                  placeholder="es_CO"
+                  value={newWhatsappTemplate.language}
+                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, language: event.target.value }))}
+                  disabled={isCreatingWhatsappTemplate}
+                />
+              </label>
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Categoría Meta</span>
+                <SearchableSelect
+                  options={[
+                    { value: 'MARKETING', label: 'MARKETING' },
+                    { value: 'UTILITY', label: 'UTILITY' },
+                    { value: 'AUTHENTICATION', label: 'AUTHENTICATION' },
+                  ]}
+                  value={newWhatsappTemplate.category}
+                  onChange={(value) => setNewWhatsappTemplate((prev) => ({ ...prev, category: String(value || 'MARKETING') as 'MARKETING' | 'UTILITY' | 'AUTHENTICATION' }))}
+                  isClearable={false}
+                  isDisabled={isCreatingWhatsappTemplate}
+                />
+              </label>
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Etiqueta opcional</span>
+                <input
+                  className="input input-bordered w-full"
+                  placeholder="Primer contacto"
+                  value={newWhatsappTemplate.label}
+                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, label: event.target.value }))}
+                  disabled={isCreatingWhatsappTemplate}
+                />
+              </label>
+              <label className="form-control w-full md:col-span-4">
+                <span className="label-text mb-2">Body de plantilla (Meta)</span>
+                <textarea
+                  className="textarea textarea-bordered w-full"
+                  rows={4}
+                  placeholder={'Hola {{1}}, te damos la bienvenida a VualaCRM'}
+                  value={newWhatsappTemplate.body_text}
+                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, body_text: event.target.value }))}
+                  disabled={isCreatingWhatsappTemplate}
+                />
+                <span className="mt-1 text-xs text-base-content/60">
+                  Usa variables como {`{{1}}`} o {`{{2}}`} si la plantilla las necesita.
+                </span>
+              </label>
+              <label className="form-control w-full md:col-span-4">
+                <span className="label-text mb-2">Ejemplos para variables (opcional)</span>
+                <input
+                  className="input input-bordered w-full"
+                  placeholder="Carlos, Bogotá (separado por coma)"
+                  value={newWhatsappTemplate.example_values_text}
+                  onChange={(event) => setNewWhatsappTemplate((prev) => ({ ...prev, example_values_text: event.target.value }))}
+                  disabled={isCreatingWhatsappTemplate}
+                />
+                <span className="mt-1 text-xs text-base-content/60">
+                  Si el body tiene variables, agrega ejemplos en orden para que Meta valide.
+                </span>
+              </label>
+            </div>
+
+            <div className="modal-action">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setIsTemplateModalOpen(false)}
+                disabled={isCreatingWhatsappTemplate}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleCreateWhatsappTemplateInMeta}
+                disabled={isCreatingWhatsappTemplate}
+              >
+                {isCreatingWhatsappTemplate ? <span className="loading loading-spinner loading-sm" /> : null}
+                {isCreatingWhatsappTemplate ? 'Creando...' : 'Crear en Meta'}
+              </button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => !isCreatingWhatsappTemplate && setIsTemplateModalOpen(false)} />
+        </div>
       )}
 
       {isCategoryModalOpen && (
