@@ -78,7 +78,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
     retry: false,
   });
 
-  const { data: metaConfig } = useQuery({
+  const { data: metaConfig, isLoading: isMetaConfigLoading } = useQuery({
     queryKey: ['whatsapp-meta-config', resolvedCompanyId],
     queryFn: () => whatsappService.getMetaConfig(resolvedCompanyId ?? undefined),
     enabled: Boolean(resolvedCompanyId),
@@ -403,10 +403,12 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const isGeoFilterMode = broadcastTargetType === 'geo';
   const isClientFilterMode = broadcastTargetType === 'client';
   const isSpecificMode = broadcastTargetType === 'specific';
-  const segmentedTabBaseClass =
-    'inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
-  const segmentedTabActiveClass = 'bg-base-100 text-primary shadow-sm';
-  const segmentedTabInactiveClass = 'text-base-content/70 hover:bg-base-100/70 hover:text-base-content';
+  const tabNavClass = 'flex flex-wrap items-end gap-1 border-b border-base-300';
+  const tabButtonBaseClass =
+    '-mb-px inline-flex items-center justify-center rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
+  const tabButtonActiveClass = 'border-primary text-primary bg-base-100';
+  const tabButtonInactiveClass = 'border-transparent text-base-content/70 hover:text-base-content hover:border-base-300';
+  const isCompanyConfigured = Boolean(metaConfig?.is_configured);
 
   return (
     <div className="p-6 space-y-6">
@@ -435,7 +437,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
       </section>
 
       <section className="rounded-3xl border border-base-200 bg-base-100 p-5 shadow space-y-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_250px]">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <label className="form-control w-full">
             <span className="label-text mb-2">Buscar conversación</span>
             <input
@@ -443,6 +445,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
               value={searchConversation}
               onChange={(event) => setSearchConversation(event.target.value)}
               placeholder="Nombre o teléfono"
+              disabled={!resolvedCompanyId || !isCompanyConfigured}
             />
           </label>
 
@@ -466,429 +469,435 @@ const CrmWhatsappInboxPage: React.FC = () => {
             )}
           </label>
         </div>
-
-        <div className="inline-grid w-full grid-cols-2 rounded-2xl bg-base-200/70 p-1 md:w-fit">
-          <button
-            type="button"
-            className={`${segmentedTabBaseClass} ${activeTab === 'chat' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
-            onClick={() => setActiveTab('chat')}
-          >
-            Chats
-          </button>
-          <button
-            type="button"
-            className={`${segmentedTabBaseClass} ${activeTab === 'send' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
-            onClick={() => setActiveTab('send')}
-          >
-            Envíos
-          </button>
-        </div>
       </section>
+      <section className="rounded-3xl border border-base-200 bg-base-100 p-5 shadow">
+        {!resolvedCompanyId ? (
+          <div className="rounded-2xl border border-base-200 bg-base-50 p-6 text-sm text-base-content/70">
+            Selecciona una compañía para usar el Inbox de WhatsApp.
+          </div>
+        ) : isMetaConfigLoading ? (
+          <div className="py-12 text-center">
+            <span className="loading loading-spinner loading-md" />
+          </div>
+        ) : !isCompanyConfigured ? (
+          <div className="rounded-2xl border border-warning/30 bg-warning/10 p-6">
+            <h3 className="text-base font-semibold text-warning-content">Configuración pendiente</h3>
+            <p className="mt-2 text-sm text-base-content/80">
+              Esta compañía aún no tiene la integración de WhatsApp (Meta) configurada. Configúrala para habilitar el Inbox y los envíos.
+            </p>
+            {resolvedCompanyId && canReadCompanies && (
+              <div className="mt-4">
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => navigate(`/companies/${resolvedCompanyId}`)}>
+                  Ir a configurar compañía
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className={`${tabNavClass}`}>
+              <button
+                type="button"
+                className={`${tabButtonBaseClass} ${activeTab === 'chat' ? tabButtonActiveClass : tabButtonInactiveClass}`}
+                onClick={() => setActiveTab('chat')}
+              >
+                Chats
+              </button>
+              <button
+                type="button"
+                className={`${tabButtonBaseClass} ${activeTab === 'send' ? tabButtonActiveClass : tabButtonInactiveClass}`}
+                onClick={() => setActiveTab('send')}
+              >
+                Envíos
+              </button>
+            </div>
 
-      {activeTab === 'chat' ? (
-        <section className="grid grid-cols-1 gap-5 xl:grid-cols-[340px_1fr]">
-          <aside className="rounded-3xl border border-base-200 bg-base-100 p-4 shadow h-[560px] overflow-auto">
-            <h2 className="text-lg font-semibold mb-3">Chats</h2>
-            {isConversationsLoading ? (
-              <div className="py-10 text-center"><span className="loading loading-spinner loading-md" /></div>
-            ) : conversations.length === 0 ? (
-              <p className="text-sm text-base-content/60">No hay conversaciones disponibles para esta compañía.</p>
-            ) : (
-              <div className="space-y-2">
-                {conversations.map((conversation) => (
-                  <button
-                    key={conversation.id}
-                    type="button"
-                    className={`w-full rounded-2xl border p-3 text-left transition ${
-                      activeConversationId === conversation.id
-                        ? 'border-primary bg-primary/8'
-                        : 'border-base-200 bg-base-50 hover:bg-base-100'
-                    }`}
-                    onClick={() => setActiveConversationId(conversation.id)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 items-start gap-2">
-                        <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-green-100 text-green-600">
-                          <FaWhatsapp className="h-4 w-4" />
+            <div className="pt-5">
+              {activeTab === 'chat' ? (
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[340px_1fr]">
+                  <aside className="rounded-3xl border border-base-200 bg-base-100 p-4 shadow h-[560px] overflow-auto">
+                    <h2 className="text-lg font-semibold mb-3">Chats</h2>
+                    {isConversationsLoading ? (
+                      <div className="py-10 text-center"><span className="loading loading-spinner loading-md" /></div>
+                    ) : conversations.length === 0 ? (
+                      <p className="text-sm text-base-content/60">No hay conversaciones disponibles para esta compañía.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {conversations.map((conversation) => (
+                          <button
+                            key={conversation.id}
+                            type="button"
+                            className={`w-full rounded-2xl border p-3 text-left transition ${
+                              activeConversationId === conversation.id
+                                ? 'border-primary bg-primary/8'
+                                : 'border-base-200 bg-base-50 hover:bg-base-100'
+                            }`}
+                            onClick={() => setActiveConversationId(conversation.id)}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex min-w-0 items-start gap-2">
+                                <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-green-100 text-green-600">
+                                  <FaWhatsapp className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold truncate">{conversation.contact_name || conversation.contact_phone || 'Sin nombre'}</div>
+                                  <div className="text-xs text-base-content/60 truncate">{conversation.contact_phone || 'Sin teléfono'}</div>
+                                  <div className="mt-1">
+                                    {conversation.client?.client_type === 'person' && (
+                                      <span className="badge badge-info badge-xs">Persona</span>
+                                    )}
+                                    {conversation.client?.client_type === 'company' && (
+                                      <span className="badge badge-secondary badge-xs">
+                                        Empresa: {conversation.client?.name || 'Sin nombre'}
+                                      </span>
+                                    )}
+                                    {!conversation.client?.client_type && (
+                                      <span className="badge badge-ghost badge-xs">Contacto</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              {Number(conversation.unread_count || 0) > 0 && (
+                                <span className="badge badge-primary badge-sm">{conversation.unread_count}</span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </aside>
+
+                  <div className="rounded-3xl border border-base-200 bg-base-100 p-4 shadow h-[560px] flex flex-col">
+                    <div className="border-b border-base-200 pb-3 mb-3">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600">
+                          <FaWhatsapp className="h-5 w-5" />
                         </div>
-                        <div className="min-w-0">
-                          <div className="font-semibold truncate">{conversation.contact_name || conversation.contact_phone || 'Sin nombre'}</div>
-                          <div className="text-xs text-base-content/60 truncate">{conversation.contact_phone || 'Sin teléfono'}</div>
-                          <div className="mt-1">
-                            {conversation.client?.client_type === 'person' && (
-                              <span className="badge badge-info badge-xs">Persona</span>
-                            )}
-                            {conversation.client?.client_type === 'company' && (
-                              <span className="badge badge-secondary badge-xs">
-                                Empresa: {conversation.client?.name || 'Sin nombre'}
-                              </span>
-                            )}
-                            {!conversation.client?.client_type && (
-                              <span className="badge badge-ghost badge-xs">Contacto</span>
-                            )}
-                          </div>
+                        <div>
+                          <h2 className="text-lg font-semibold">
+                            {activeConversation?.contact_name || activeConversation?.contact_phone || 'Selecciona un chat'}
+                          </h2>
+                          <p className="text-sm text-base-content/60">
+                            {activeConversation?.contact_phone || 'No hay conversación activa'}
+                          </p>
+                          {activeConversation && (
+                            <p className="mt-1 text-xs text-base-content/70">{activeClientLabel}</p>
+                          )}
                         </div>
                       </div>
-                      {Number(conversation.unread_count || 0) > 0 && (
-                        <span className="badge badge-primary badge-sm">{conversation.unread_count}</span>
+                    </div>
+
+                    <div ref={messagesContainerRef} className="flex-1 overflow-auto space-y-3 pr-1">
+                      {isMessagesLoading ? (
+                        <div className="py-10 text-center"><span className="loading loading-spinner loading-md" /></div>
+                      ) : messages.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-sm text-base-content/60">
+                          No hay mensajes para mostrar.
+                        </div>
+                      ) : (
+                        messages.map((message) => (
+                          <div
+                            key={message.id}
+                            className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
+                              message.direction === 'outbound'
+                                ? 'ml-auto bg-primary text-primary-content'
+                                : 'bg-base-200 text-base-content'
+                            }`}
+                          >
+                            <div>{message.body}</div>
+                            <div className={`mt-1 text-[11px] ${message.direction === 'outbound' ? 'text-primary-content/80' : 'text-base-content/60'}`}>
+                              {message.sent_at ? new Date(message.sent_at).toLocaleString() : ''}
+                            </div>
+                          </div>
+                        ))
                       )}
                     </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </aside>
 
-          <div className="rounded-3xl border border-base-200 bg-base-100 p-4 shadow h-[560px] flex flex-col">
-            <div className="border-b border-base-200 pb-3 mb-3">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600">
-                  <FaWhatsapp className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold">
-                    {activeConversation?.contact_name || activeConversation?.contact_phone || 'Selecciona un chat'}
-                  </h2>
-                  <p className="text-sm text-base-content/60">
-                    {activeConversation?.contact_phone || 'No hay conversación activa'}
-                  </p>
-                  {activeConversation && (
-                    <p className="mt-1 text-xs text-base-content/70">{activeClientLabel}</p>
-                  )}
-                </div>
-              </div>
-            </div>
+                    <div className="mt-3 space-y-3">
+                      <div className={`${tabNavClass}`}>
+                        <button
+                          type="button"
+                          className={`${tabButtonBaseClass} ${sendMode === 'text' ? tabButtonActiveClass : tabButtonInactiveClass}`}
+                          onClick={() => setSendMode('text')}
+                        >
+                          Texto
+                        </button>
+                        <button
+                          type="button"
+                          className={`${tabButtonBaseClass} ${sendMode === 'template' ? tabButtonActiveClass : tabButtonInactiveClass}`}
+                          onClick={() => setSendMode('template')}
+                        >
+                          Plantilla
+                        </button>
+                      </div>
 
-            <div ref={messagesContainerRef} className="flex-1 overflow-auto space-y-3 pr-1">
-              {isMessagesLoading ? (
-                <div className="py-10 text-center"><span className="loading loading-spinner loading-md" /></div>
-              ) : messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-sm text-base-content/60">
-                  No hay mensajes para mostrar.
-                </div>
-              ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
-                      message.direction === 'outbound'
-                        ? 'ml-auto bg-primary text-primary-content'
-                        : 'bg-base-200 text-base-content'
-                    }`}
-                  >
-                    <div>{message.body}</div>
-                    <div className={`mt-1 text-[11px] ${message.direction === 'outbound' ? 'text-primary-content/80' : 'text-base-content/60'}`}>
-                      {message.sent_at ? new Date(message.sent_at).toLocaleString() : ''}
+                      {sendMode === 'template' ? (
+                        <div className="space-y-3 rounded-2xl border border-base-200 p-3">
+                          <label className="form-control w-full">
+                            <span className="label-text mb-2">Plantilla</span>
+                            <SearchableSelect
+                              options={availableTemplates.map((template) => ({
+                                value: `${template.name}::${template.language}`,
+                                label: `${template.label} (${template.language})`,
+                              }))}
+                              value={selectedTemplateKey}
+                              onChange={(value) => setSelectedTemplateKey(value ? String(value) : null)}
+                              placeholder="Selecciona una plantilla"
+                              isDisabled={!activeConversationId || sendingMessage || availableTemplates.length === 0}
+                              isClearable={false}
+                            />
+                          </label>
+
+                          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                            {templateVariables.map((value, index) => (
+                              <label key={`template-var-${index}`} className="form-control w-full">
+                                <span className="label-text mb-1 text-xs">Variable {`{{${index + 1}}}`}</span>
+                                <input
+                                  className="input input-bordered w-full"
+                                  placeholder={index === 0 ? 'Nombre del contacto' : `Valor para {{${index + 1}}}`}
+                                  value={value}
+                                  onChange={(event) => {
+                                    const nextValues = [...templateVariables];
+                                    nextValues[index] = event.target.value;
+                                    setTemplateVariables(nextValues);
+                                  }}
+                                  disabled={!activeConversationId || sendingMessage}
+                                />
+                              </label>
+                            ))}
+                          </div>
+                          <p className="text-xs text-base-content/60">
+                            Por defecto, la variable {`{{1}}`} se llena con el nombre del contacto activo.
+                          </p>
+                          <div className="rounded-xl border border-base-200 bg-base-50 px-3 py-2 text-sm">
+                            <div className="text-xs text-base-content/60 mb-1">Vista previa</div>
+                            <div className="whitespace-pre-wrap">{buildTemplatePreview(selectedTemplateKey, templateVariables)}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="input input-bordered w-full"
+                            placeholder="Escribe tu respuesta..."
+                            value={messageDraft}
+                            onChange={(event) => setMessageDraft(event.target.value)}
+                            onKeyDown={handleComposerKeyDown}
+                            disabled={!activeConversationId || sendingMessage}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={handleSendMessage}
+                            disabled={!activeConversationId || !messageDraft.trim() || sendingMessage}
+                          >
+                            <BiSend className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+
+                      {sendMode === 'template' && (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={handleSendMessage}
+                            disabled={!activeConversationId || !selectedTemplateKey || sendingMessage}
+                          >
+                            <BiSend className="w-4 h-4" />
+                            Enviar plantilla
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-
-            <div className="mt-3 space-y-3">
-              <div className="inline-grid w-full grid-cols-2 rounded-2xl bg-base-200/70 p-1 md:w-fit">
-                <button
-                  type="button"
-                  className={`${segmentedTabBaseClass} ${sendMode === 'text' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
-                  onClick={() => setSendMode('text')}
-                >
-                  Texto
-                </button>
-                <button
-                  type="button"
-                  className={`${segmentedTabBaseClass} ${sendMode === 'template' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
-                  onClick={() => setSendMode('template')}
-                >
-                  Plantilla
-                </button>
-              </div>
-
-              {sendMode === 'template' ? (
-                <div className="space-y-3 rounded-2xl border border-base-200 p-3">
-                  <label className="form-control w-full">
-                    <span className="label-text mb-2">Plantilla</span>
-                    <SearchableSelect
-                      options={availableTemplates.map((template) => ({
-                        value: `${template.name}::${template.language}`,
-                        label: `${template.label} (${template.language})`,
-                      }))}
-                      value={selectedTemplateKey}
-                      onChange={(value) => setSelectedTemplateKey(value ? String(value) : null)}
-                      placeholder="Selecciona una plantilla"
-                      isDisabled={!activeConversationId || sendingMessage || availableTemplates.length === 0}
-                      isClearable={false}
-                    />
-                  </label>
-
-                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    {templateVariables.map((value, index) => (
-                      <label key={`template-var-${index}`} className="form-control w-full">
-                        <span className="label-text mb-1 text-xs">Variable {`{{${index + 1}}}`}</span>
-                        <input
-                          className="input input-bordered w-full"
-                          placeholder={index === 0 ? 'Nombre del contacto' : `Valor para {{${index + 1}}}`}
-                          value={value}
-                          onChange={(event) => {
-                            const nextValues = [...templateVariables];
-                            nextValues[index] = event.target.value;
-                            setTemplateVariables(nextValues);
-                          }}
-                          disabled={!activeConversationId || sendingMessage}
-                        />
-                      </label>
-                    ))}
-                  </div>
-                  <p className="text-xs text-base-content/60">
-                    Por defecto, la variable {`{{1}}`} se llena con el nombre del contacto activo.
-                  </p>
-                  <div className="rounded-xl border border-base-200 bg-base-50 px-3 py-2 text-sm">
-                    <div className="text-xs text-base-content/60 mb-1">Vista previa</div>
-                    <div className="whitespace-pre-wrap">{buildTemplatePreview(selectedTemplateKey, templateVariables)}</div>
-                  </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <input
-                    className="input input-bordered w-full"
-                    placeholder="Escribe tu respuesta..."
-                    value={messageDraft}
-                    onChange={(event) => setMessageDraft(event.target.value)}
-                    onKeyDown={handleComposerKeyDown}
-                    disabled={!activeConversationId || sendingMessage}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleSendMessage}
-                    disabled={!activeConversationId || !messageDraft.trim() || sendingMessage}
-                  >
-                    <BiSend className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+                <div className="rounded-3xl border border-base-200 bg-base-100 p-5 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2">
+                    <BiTask className="w-5 h-5 text-primary" />
+                    <h3 className="text-lg font-semibold">Centro de envíos</h3>
+                  </div>
+                  <p className="text-sm text-base-content/60">
+                    Envía por números específicos, por empresa/cliente o por filtros geográficos (país, estado, ciudad).
+                  </p>
 
-              {sendMode === 'template' && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleSendMessage}
-                    disabled={!activeConversationId || !selectedTemplateKey || sendingMessage}
-                  >
-                    <BiSend className="w-4 h-4" />
-                    Enviar plantilla
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      ) : (
-        <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <div className="rounded-3xl border border-base-200 bg-base-100 p-5 shadow space-y-4">
-            <div className="flex items-center gap-2">
-              <BiTask className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-semibold">Centro de envíos</h3>
-            </div>
-            <p className="text-sm text-base-content/60">
-              Envía por números específicos, por empresa/cliente o por filtros geográficos (país, estado, ciudad).
-            </p>
+                  <div className={`${tabNavClass}`}>
+                    <button
+                      type="button"
+                      className={`${tabButtonBaseClass} ${broadcastSendMode === 'text' ? tabButtonActiveClass : tabButtonInactiveClass}`}
+                      onClick={() => setBroadcastSendMode('text')}
+                    >
+                      Texto
+                    </button>
+                    <button
+                      type="button"
+                      className={`${tabButtonBaseClass} ${broadcastSendMode === 'template' ? tabButtonActiveClass : tabButtonInactiveClass}`}
+                      onClick={() => setBroadcastSendMode('template')}
+                    >
+                      Plantilla
+                    </button>
+                  </div>
 
-            <div className="inline-grid w-full grid-cols-2 rounded-2xl bg-base-200/70 p-1 md:w-fit">
-              <button
-                type="button"
-                className={`${segmentedTabBaseClass} ${broadcastSendMode === 'text' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
-                onClick={() => setBroadcastSendMode('text')}
-              >
-                Texto
-              </button>
-              <button
-                type="button"
-                className={`${segmentedTabBaseClass} ${broadcastSendMode === 'template' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
-                onClick={() => setBroadcastSendMode('template')}
-              >
-                Plantilla
-              </button>
-            </div>
-
-            {broadcastSendMode === 'template' ? (
-              <div className="space-y-3 rounded-2xl border border-base-200 p-3">
-                <label className="form-control w-full">
-                  <span className="label-text mb-2">Plantilla</span>
-                  <SearchableSelect
-                    options={availableTemplates.map((template) => ({
-                      value: `${template.name}::${template.language}`,
-                      label: `${template.label} (${template.language})`,
-                    }))}
-                    value={broadcastTemplateKey}
-                    onChange={(value) => setBroadcastTemplateKey(value ? String(value) : null)}
-                    placeholder="Selecciona una plantilla"
-                    isDisabled={sendingBroadcast || availableTemplates.length === 0}
-                    isClearable={false}
-                  />
-                </label>
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  {broadcastTemplateVariables.map((value, index) => (
-                    <label key={`broadcast-template-var-${index}`} className="form-control w-full">
-                      <span className="label-text mb-1 text-xs">Variable {`{{${index + 1}}}`}</span>
-                      <input
-                        className="input input-bordered w-full"
-                        placeholder={index === 0 ? 'Nombre (por defecto)' : `Valor para {{${index + 1}}}`}
-                        value={value}
-                        onChange={(event) => {
-                          const next = [...broadcastTemplateVariables];
-                          next[index] = event.target.value;
-                          setBroadcastTemplateVariables(next);
-                        }}
-                        disabled={sendingBroadcast}
+                  {broadcastSendMode === 'template' ? (
+                    <div className="space-y-3 rounded-2xl border border-base-200 p-3">
+                      <label className="form-control w-full">
+                        <span className="label-text mb-2">Plantilla</span>
+                        <SearchableSelect
+                          options={availableTemplates.map((template) => ({
+                            value: `${template.name}::${template.language}`,
+                            label: `${template.label} (${template.language})`,
+                          }))}
+                          value={broadcastTemplateKey}
+                          onChange={(value) => setBroadcastTemplateKey(value ? String(value) : null)}
+                          placeholder="Selecciona una plantilla"
+                          isDisabled={sendingBroadcast || availableTemplates.length === 0}
+                          isClearable={false}
+                        />
+                      </label>
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                        {broadcastTemplateVariables.map((value, index) => (
+                          <label key={`broadcast-template-var-${index}`} className="form-control w-full">
+                            <span className="label-text mb-1 text-xs">Variable {`{{${index + 1}}}`}</span>
+                            <input
+                              className="input input-bordered w-full"
+                              placeholder={index === 0 ? 'Nombre (por defecto)' : `Valor para {{${index + 1}}}`}
+                              value={value}
+                              onChange={(event) => {
+                                const next = [...broadcastTemplateVariables];
+                                next[index] = event.target.value;
+                                setBroadcastTemplateVariables(next);
+                              }}
+                              disabled={sendingBroadcast}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <div className="rounded-xl border border-base-200 bg-base-50 px-3 py-2 text-sm">
+                        <div className="text-xs text-base-content/60 mb-1">Vista previa</div>
+                        <div className="whitespace-pre-wrap">{buildTemplatePreview(broadcastTemplateKey, broadcastTemplateVariables)}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="form-control w-full">
+                      <span className="label-text mb-2">Mensaje</span>
+                      <textarea
+                        rows={4}
+                        className="textarea textarea-bordered w-full"
+                        placeholder="Hola, este es un mensaje..."
+                        value={broadcastMessage}
+                        onChange={(event) => setBroadcastMessage(event.target.value)}
                       />
                     </label>
-                  ))}
+                  )}
+
+                  <div className={`${tabNavClass}`}>
+                    <button
+                      type="button"
+                      className={`${tabButtonBaseClass} ${isSpecificMode ? tabButtonActiveClass : tabButtonInactiveClass}`}
+                      onClick={() => setBroadcastTargetType('specific')}
+                    >
+                      Números
+                    </button>
+                    <button
+                      type="button"
+                      className={`${tabButtonBaseClass} ${isClientFilterMode ? tabButtonActiveClass : tabButtonInactiveClass}`}
+                      onClick={() => setBroadcastTargetType('client')}
+                    >
+                      Empresa/Cliente
+                    </button>
+                    <button
+                      type="button"
+                      className={`${tabButtonBaseClass} ${isGeoFilterMode ? tabButtonActiveClass : tabButtonInactiveClass}`}
+                      onClick={() => setBroadcastTargetType('geo')}
+                    >
+                      País/Estado/Ciudad
+                    </button>
+                  </div>
+
+                  {isSpecificMode && (
+                    <label className="form-control w-full">
+                      <span className="label-text mb-2">Teléfonos destino</span>
+                      <textarea
+                        rows={5}
+                        className="textarea textarea-bordered w-full"
+                        placeholder="573001112233&#10;573004445566"
+                        value={broadcastPhones}
+                        onChange={(event) => setBroadcastPhones(event.target.value)}
+                      />
+                    </label>
+                  )}
+
+                  {isClientFilterMode && (
+                    <label className="form-control w-full">
+                      <span className="label-text mb-2">Selecciona empresa/cliente</span>
+                      <SearchableSelect
+                        options={clientOptions}
+                        value={selectedBroadcastClientId}
+                        onChange={(value) => setSelectedBroadcastClientId(value ? Number(value) : null)}
+                        placeholder="Selecciona un cliente"
+                        isClearable
+                      />
+                    </label>
+                  )}
+
+                  {isGeoFilterMode && (
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <label className="form-control w-full">
+                        <span className="label-text mb-2">País</span>
+                        <SearchableSelect
+                          options={countries.map((country) => ({ value: country.id, label: country.name }))}
+                          value={broadcastCountryId}
+                          onChange={(value) => setBroadcastCountryId(value ? Number(value) : null)}
+                          placeholder="Todos"
+                          isClearable
+                        />
+                      </label>
+                      <label className="form-control w-full">
+                        <span className="label-text mb-2">Estado</span>
+                        <SearchableSelect
+                          options={states.map((state) => ({ value: state.id, label: state.name }))}
+                          value={broadcastStateId}
+                          onChange={(value) => setBroadcastStateId(value ? Number(value) : null)}
+                          placeholder={broadcastCountryId ? 'Todos' : 'Selecciona país'}
+                          isDisabled={!broadcastCountryId}
+                          isClearable
+                        />
+                      </label>
+                      <label className="form-control w-full">
+                        <span className="label-text mb-2">Ciudad</span>
+                        <SearchableSelect
+                          options={cities.map((city) => ({ value: city.id, label: city.name }))}
+                          value={broadcastCityId}
+                          onChange={(value) => setBroadcastCityId(value ? Number(value) : null)}
+                          placeholder={broadcastStateId ? 'Todas' : 'Selecciona estado'}
+                          isDisabled={!broadcastStateId}
+                          isClearable
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  <label className="flex items-center gap-2 rounded-xl border border-base-200 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm"
+                      checked={includeClientContacts}
+                      onChange={(event) => setIncludeClientContacts(event.target.checked)}
+                    />
+                    <span className="text-sm">Incluir también teléfonos de contactos</span>
+                  </label>
+
+                  <div className="flex justify-end">
+                    <button type="button" className="btn btn-primary" onClick={handleBroadcast} disabled={sendingBroadcast}>
+                      {sendingBroadcast ? 'Enviando...' : 'Enviar'}
+                    </button>
+                  </div>
                 </div>
-                <div className="rounded-xl border border-base-200 bg-base-50 px-3 py-2 text-sm">
-                  <div className="text-xs text-base-content/60 mb-1">Vista previa</div>
-                  <div className="whitespace-pre-wrap">{buildTemplatePreview(broadcastTemplateKey, broadcastTemplateVariables)}</div>
-                </div>
-              </div>
-            ) : (
-              <label className="form-control w-full">
-                <span className="label-text mb-2">Mensaje</span>
-                <textarea
-                  rows={4}
-                  className="textarea textarea-bordered w-full"
-                  placeholder="Hola, este es un mensaje..."
-                  value={broadcastMessage}
-                  onChange={(event) => setBroadcastMessage(event.target.value)}
-                />
-              </label>
-            )}
-
-            <div className="inline-grid w-full grid-cols-1 gap-1 rounded-2xl bg-base-200/70 p-1 md:w-fit md:grid-cols-3">
-              <button
-                type="button"
-                className={`${segmentedTabBaseClass} ${isSpecificMode ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
-                onClick={() => setBroadcastTargetType('specific')}
-              >
-                Números
-              </button>
-              <button
-                type="button"
-                className={`${segmentedTabBaseClass} ${isClientFilterMode ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
-                onClick={() => setBroadcastTargetType('client')}
-              >
-                Empresa/Cliente
-              </button>
-              <button
-                type="button"
-                className={`${segmentedTabBaseClass} ${isGeoFilterMode ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
-                onClick={() => setBroadcastTargetType('geo')}
-              >
-                País/Estado/Ciudad
-              </button>
+              )}
             </div>
-
-            {isSpecificMode && (
-              <label className="form-control w-full">
-                <span className="label-text mb-2">Teléfonos destino</span>
-                <textarea
-                  rows={5}
-                  className="textarea textarea-bordered w-full"
-                  placeholder="573001112233&#10;573004445566"
-                  value={broadcastPhones}
-                  onChange={(event) => setBroadcastPhones(event.target.value)}
-                />
-              </label>
-            )}
-
-            {isClientFilterMode && (
-              <label className="form-control w-full">
-                <span className="label-text mb-2">Selecciona empresa/cliente</span>
-                <SearchableSelect
-                  options={clientOptions}
-                  value={selectedBroadcastClientId}
-                  onChange={(value) => setSelectedBroadcastClientId(value ? Number(value) : null)}
-                  placeholder="Selecciona un cliente"
-                  isClearable
-                />
-              </label>
-            )}
-
-            {isGeoFilterMode && (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <label className="form-control w-full">
-                  <span className="label-text mb-2">País</span>
-                  <SearchableSelect
-                    options={countries.map((country) => ({ value: country.id, label: country.name }))}
-                    value={broadcastCountryId}
-                    onChange={(value) => setBroadcastCountryId(value ? Number(value) : null)}
-                    placeholder="Todos"
-                    isClearable
-                  />
-                </label>
-                <label className="form-control w-full">
-                  <span className="label-text mb-2">Estado</span>
-                  <SearchableSelect
-                    options={states.map((state) => ({ value: state.id, label: state.name }))}
-                    value={broadcastStateId}
-                    onChange={(value) => setBroadcastStateId(value ? Number(value) : null)}
-                    placeholder={broadcastCountryId ? 'Todos' : 'Selecciona país'}
-                    isDisabled={!broadcastCountryId}
-                    isClearable
-                  />
-                </label>
-                <label className="form-control w-full">
-                  <span className="label-text mb-2">Ciudad</span>
-                  <SearchableSelect
-                    options={cities.map((city) => ({ value: city.id, label: city.name }))}
-                    value={broadcastCityId}
-                    onChange={(value) => setBroadcastCityId(value ? Number(value) : null)}
-                    placeholder={broadcastStateId ? 'Todas' : 'Selecciona estado'}
-                    isDisabled={!broadcastStateId}
-                    isClearable
-                  />
-                </label>
-              </div>
-            )}
-
-            <label className="flex items-center gap-2 rounded-xl border border-base-200 px-3 py-2">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={includeClientContacts}
-                onChange={(event) => setIncludeClientContacts(event.target.checked)}
-              />
-              <span className="text-sm">Incluir también teléfonos de contactos</span>
-            </label>
-
-            <div className="flex justify-end">
-              <button type="button" className="btn btn-primary" onClick={handleBroadcast} disabled={sendingBroadcast}>
-                {sendingBroadcast ? 'Enviando...' : 'Enviar'}
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-base-200 bg-base-100 p-5 shadow space-y-3">
-            <h3 className="text-lg font-semibold">Configuración de integración</h3>
-            <p className="text-sm text-base-content/60">
-              La configuración de llaves Meta/WhatsApp y plantillas se administra desde el detalle de la compañía.
-            </p>
-            <div className="rounded-2xl border border-base-200 bg-base-50 p-4">
-              <div className="text-sm text-base-content/60">Estado actual</div>
-              <div className="mt-1 flex items-center gap-2 text-sm">
-                {metaConfig?.is_configured ? <BiCheckCircle className="h-4 w-4 text-success" /> : <BiTime className="h-4 w-4 text-warning" />}
-                {metaConfig?.is_configured ? 'Configuración completa' : 'Faltan llaves de integración'}
-              </div>
-            </div>
-            {resolvedCompanyId && canReadCompanies && (
-              <div className="flex justify-end">
-                <button type="button" className="btn btn-outline" onClick={() => navigate(`/companies/${resolvedCompanyId}`)}>
-                  Ir a la compañía
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+          </>
+        )}
+      </section>
     </div>
   );
 };
