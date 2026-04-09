@@ -2,6 +2,7 @@ import api from '../lib/axios';
 import type {
   WhatsappBroadcastPayload,
   WhatsappConversation,
+  WhatsappCreateTemplatePayload,
   WhatsappMessage,
   WhatsappMetaConfig,
   WhatsappTemplatePreview,
@@ -61,5 +62,21 @@ export const whatsappService = {
   }): Promise<WhatsappTemplatePreview> {
     const response = await api.get('/crm/whatsapp/template-preview', { params });
     return unwrap<WhatsappTemplatePreview>(response.data);
+  },
+
+  async createTemplateInMeta(payload: WhatsappCreateTemplatePayload): Promise<{
+    template: {
+      name: string;
+      language: string;
+      category: string;
+      label?: string | null;
+      body_text?: string | null;
+      status?: string;
+      is_active?: boolean;
+    };
+    meta?: any;
+  }> {
+    const response = await api.post('/crm/whatsapp/templates', payload);
+    return unwrap(response.data);
   },
 };

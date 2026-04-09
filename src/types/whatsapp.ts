@@ -84,3 +84,13 @@ export interface WhatsappTemplatePreview {
     text?: string | null;
   }>;
 }
+
+export interface WhatsappCreateTemplatePayload {
+  company_id?: number;
+  name: string;
+  language?: string;
+  category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+  body_text: string;
+  label?: string;
+  example_values?: string[];
+}
