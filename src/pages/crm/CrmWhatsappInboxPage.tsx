@@ -5,7 +5,9 @@ import { FaWhatsapp } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import SearchableSelect from '../../components/ui/SearchableSelect';
+import { clientService } from '../../services/clientService';
 import { companyService } from '../../services/companyService';
+import { geoService } from '../../services/geoService';
 import { whatsappService } from '../../services/whatsappService';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -18,6 +20,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const userCompanyId = Number(user?.company_id) || undefined;
   const canListCompanies = hasPermission('companies.list');
   const canReadCompanies = hasPermission('companies.read');
+  const [activeTab, setActiveTab] = React.useState<'chat' | 'send'>('chat');
   const [selectedCompanyId, setSelectedCompanyId] = React.useState<number | null>(userCompanyId ?? null);
   const [searchConversation, setSearchConversation] = React.useState('');
   const [activeConversationId, setActiveConversationId] = React.useState<string | null>(null);
@@ -27,6 +30,21 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const [templateVariables, setTemplateVariables] = React.useState<string[]>(['', '', '', '', '']);
   const [sendingMessage, setSendingMessage] = React.useState(false);
   const [broadcastPhones, setBroadcastPhones] = React.useState('');
+  const [broadcastTargetType, setBroadcastTargetType] = React.useState<'specific' | 'client' | 'geo'>('specific');
+  const [broadcastSendMode, setBroadcastSendMode] = React.useState<'text' | 'template'>('text');
+  const [broadcastTemplateKey, setBroadcastTemplateKey] = React.useState<string | null>(null);
+  const [broadcastTemplateVariables, setBroadcastTemplateVariables] = React.useState<string[]>([
+    user?.name || '',
+    '',
+    '',
+    '',
+    '',
+  ]);
+  const [selectedBroadcastClientId, setSelectedBroadcastClientId] = React.useState<number | null>(null);
+  const [includeClientContacts, setIncludeClientContacts] = React.useState(true);
+  const [broadcastCountryId, setBroadcastCountryId] = React.useState<number | null>(null);
+  const [broadcastStateId, setBroadcastStateId] = React.useState<number | null>(null);
+  const [broadcastCityId, setBroadcastCityId] = React.useState<number | null>(null);
   const [broadcastMessage, setBroadcastMessage] = React.useState('');
   const [sendingBroadcast, setSendingBroadcast] = React.useState(false);
   const [markingReadConversationId, setMarkingReadConversationId] = React.useState<string | null>(null);
@@ -65,6 +83,28 @@ const CrmWhatsappInboxPage: React.FC = () => {
     queryFn: () => whatsappService.getMetaConfig(resolvedCompanyId ?? undefined),
     enabled: Boolean(resolvedCompanyId),
     retry: false,
+  });
+
+  const { data: clientsData } = useQuery({
+    queryKey: ['clients-for-whatsapp-broadcast', resolvedCompanyId],
+    queryFn: () => clientService.getClients({ company_id: resolvedCompanyId ?? undefined, per_page: 200 }),
+    enabled: Boolean(resolvedCompanyId),
+    retry: false,
+  });
+
+  const { data: countries = [] } = useQuery({
+    queryKey: ['geo-countries'],
+    queryFn: geoService.getCountries,
+  });
+  const { data: states = [] } = useQuery({
+    queryKey: ['geo-states', broadcastCountryId],
+    queryFn: () => geoService.getStatesByCountry(broadcastCountryId as number),
+    enabled: Boolean(broadcastCountryId),
+  });
+  const { data: cities = [] } = useQuery({
+    queryKey: ['geo-cities', broadcastStateId],
+    queryFn: () => geoService.getCitiesByState(broadcastStateId as number),
+    enabled: Boolean(broadcastStateId),
   });
 
   React.useEffect(() => {
@@ -123,6 +163,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
   React.useEffect(() => {
     if (availableTemplates.length === 0) {
       setSelectedTemplateKey(null);
+      setBroadcastTemplateKey(null);
       return;
     }
 
@@ -135,13 +176,17 @@ const CrmWhatsappInboxPage: React.FC = () => {
 
     if (hasPreferred && preferredKey) {
       setSelectedTemplateKey(preferredKey);
+      setBroadcastTemplateKey((prev) => prev || preferredKey);
       return;
     }
 
     if (!selectedTemplateKey) {
       setSelectedTemplateKey(`${availableTemplates[0].name}::${availableTemplates[0].language}`);
     }
-  }, [availableTemplates, metaConfig?.default_template_language, metaConfig?.default_template_name, selectedTemplateKey]);
+    if (!broadcastTemplateKey) {
+      setBroadcastTemplateKey(`${availableTemplates[0].name}::${availableTemplates[0].language}`);
+    }
+  }, [availableTemplates, metaConfig?.default_template_language, metaConfig?.default_template_name, selectedTemplateKey, broadcastTemplateKey]);
 
   React.useEffect(() => {
     setTemplateVariables((prev) => {
@@ -150,6 +195,31 @@ const CrmWhatsappInboxPage: React.FC = () => {
       return next;
     });
   }, [activeConversation?.client?.name, activeConversation?.contact_name]);
+
+  React.useEffect(() => {
+    if (!broadcastCountryId) {
+      setBroadcastStateId(null);
+      setBroadcastCityId(null);
+    }
+  }, [broadcastCountryId]);
+
+  React.useEffect(() => {
+    if (!broadcastStateId) {
+      setBroadcastCityId(null);
+    }
+  }, [broadcastStateId]);
+
+  React.useEffect(() => {
+    if (!selectedBroadcastClientId) return;
+    const selectedClient = (clientsData?.data ?? []).find((client) => client.id === selectedBroadcastClientId);
+    if (!selectedClient?.name) return;
+
+    setBroadcastTemplateVariables((prev) => {
+      const next = [...prev];
+      next[0] = selectedClient.name;
+      return next;
+    });
+  }, [clientsData?.data, selectedBroadcastClientId]);
 
   const handleSendMessage = async () => {
     if (!resolvedCompanyId || !activeConversation) return;
@@ -186,7 +256,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
       });
       setMessageDraft('');
       if (sendMode === 'template') {
-        setTemplateVariables((prev) => {
+        setTemplateVariables(() => {
           const next = ['', '', '', '', ''];
           next[0] = activeConversation?.contact_name || activeConversation?.client?.name || '';
           return next;
@@ -203,33 +273,81 @@ const CrmWhatsappInboxPage: React.FC = () => {
   };
 
   const handleBroadcast = async () => {
-    if (!resolvedCompanyId || !broadcastMessage.trim()) {
-      toast.error('Completa los datos del envío masivo');
+    if (!resolvedCompanyId) {
+      toast.error('Selecciona una compañía');
       return;
     }
 
-    const recipients = broadcastPhones
-      .split(/[\n,;]+/)
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const payload: {
+      company_id?: number;
+      recipients?: string[];
+      message?: string;
+      template_name?: string;
+      template_language?: string;
+      template_variables?: string[];
+      recipient_client_id?: number;
+      country_id?: number;
+      state_id?: number;
+      city_id?: number;
+      include_client_contacts?: boolean;
+    } = {
+      company_id: resolvedCompanyId,
+      include_client_contacts: includeClientContacts,
+    };
 
-    if (recipients.length === 0) {
-      toast.error('Agrega al menos un teléfono');
-      return;
+    if (broadcastSendMode === 'template') {
+      if (!broadcastTemplateKey) {
+        toast.error('Selecciona una plantilla');
+        return;
+      }
+      const [templateName = '', templateLanguage = 'es_CO'] = broadcastTemplateKey.split('::');
+      payload.template_name = templateName;
+      payload.template_language = templateLanguage || 'es_CO';
+      payload.template_variables = [...broadcastTemplateVariables];
+    } else {
+      if (!broadcastMessage.trim()) {
+        toast.error('Escribe el mensaje para enviar');
+        return;
+      }
+      payload.message = broadcastMessage.trim();
+    }
+
+    if (broadcastTargetType === 'specific') {
+      const recipients = broadcastPhones
+        .split(/[\n,;]+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (recipients.length === 0) {
+        toast.error('Agrega al menos un teléfono');
+        return;
+      }
+      payload.recipients = recipients;
+    } else if (broadcastTargetType === 'client') {
+      if (!selectedBroadcastClientId) {
+        toast.error('Selecciona una empresa o cliente');
+        return;
+      }
+      payload.recipient_client_id = selectedBroadcastClientId;
+    } else {
+      if (!broadcastCountryId && !broadcastStateId && !broadcastCityId) {
+        toast.error('Selecciona al menos país, estado o ciudad');
+        return;
+      }
+      payload.country_id = broadcastCountryId ?? undefined;
+      payload.state_id = broadcastStateId ?? undefined;
+      payload.city_id = broadcastCityId ?? undefined;
     }
 
     setSendingBroadcast(true);
     try {
-      await whatsappService.sendBroadcast({
-        company_id: resolvedCompanyId,
-        recipients,
-        message: broadcastMessage.trim(),
-      });
+      await whatsappService.sendBroadcast(payload);
       setBroadcastMessage('');
       setBroadcastPhones('');
-      toast.success(`Envío masivo ejecutado para ${recipients.length} contactos`);
+      setBroadcastTemplateVariables([user?.name || '', '', '', '', '']);
+      await queryClient.invalidateQueries({ queryKey: ['whatsapp-conversations', resolvedCompanyId] });
+      toast.success('Envío ejecutado correctamente');
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'No se pudo ejecutar el envío masivo');
+      toast.error(error?.response?.data?.message || 'No se pudo ejecutar el envío');
     } finally {
       setSendingBroadcast(false);
     }
@@ -243,7 +361,15 @@ const CrmWhatsappInboxPage: React.FC = () => {
   };
 
   const companyOptions = (companiesData?.data ?? []).map((company) => ({ value: company.id, label: company.name }));
+  const clientOptions = (clientsData?.data ?? [])
+    .map((client) => ({
+      value: client.id,
+      label: `${client.name}${client.phone ? ` · ${client.phone}` : ''}`,
+    }));
   const totalUnread = conversations.reduce((sum, item) => sum + Number(item.unread_count || 0), 0);
+  const isGeoFilterMode = broadcastTargetType === 'geo';
+  const isClientFilterMode = broadcastTargetType === 'client';
+  const isSpecificMode = broadcastTargetType === 'specific';
 
   return (
     <div className="p-6 space-y-6">
@@ -303,126 +429,232 @@ const CrmWhatsappInboxPage: React.FC = () => {
             )}
           </label>
         </div>
+
+        <div className="tabs tabs-boxed w-fit">
+          <button type="button" className={`tab ${activeTab === 'chat' ? 'tab-active' : ''}`} onClick={() => setActiveTab('chat')}>
+            Chats
+          </button>
+          <button type="button" className={`tab ${activeTab === 'send' ? 'tab-active' : ''}`} onClick={() => setActiveTab('send')}>
+            Envíos
+          </button>
+        </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-5 xl:grid-cols-[340px_1fr]">
-        <aside className="rounded-3xl border border-base-200 bg-base-100 p-4 shadow h-[560px] overflow-auto">
-          <h2 className="text-lg font-semibold mb-3">Chats</h2>
-          {isConversationsLoading ? (
-            <div className="py-10 text-center"><span className="loading loading-spinner loading-md" /></div>
-          ) : conversations.length === 0 ? (
-            <p className="text-sm text-base-content/60">No hay conversaciones disponibles para esta compañía.</p>
-          ) : (
-            <div className="space-y-2">
-              {conversations.map((conversation) => (
-                <button
-                  key={conversation.id}
-                  type="button"
-                  className={`w-full rounded-2xl border p-3 text-left transition ${
-                    activeConversationId === conversation.id
-                      ? 'border-primary bg-primary/8'
-                      : 'border-base-200 bg-base-50 hover:bg-base-100'
-                  }`}
-                  onClick={() => setActiveConversationId(conversation.id)}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 items-start gap-2">
-                      <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-green-100 text-green-600">
-                        <FaWhatsapp className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-semibold truncate">{conversation.contact_name || conversation.contact_phone || 'Sin nombre'}</div>
-                        <div className="text-xs text-base-content/60 truncate">{conversation.contact_phone || 'Sin teléfono'}</div>
-                        <div className="mt-1">
-                          {conversation.client?.client_type === 'person' && (
-                            <span className="badge badge-info badge-xs">Persona</span>
-                          )}
-                          {conversation.client?.client_type === 'company' && (
-                            <span className="badge badge-secondary badge-xs">
-                              Empresa: {conversation.client?.name || 'Sin nombre'}
-                            </span>
-                          )}
-                          {!conversation.client?.client_type && (
-                            <span className="badge badge-ghost badge-xs">Contacto</span>
-                          )}
+      {activeTab === 'chat' ? (
+        <section className="grid grid-cols-1 gap-5 xl:grid-cols-[340px_1fr]">
+          <aside className="rounded-3xl border border-base-200 bg-base-100 p-4 shadow h-[560px] overflow-auto">
+            <h2 className="text-lg font-semibold mb-3">Chats</h2>
+            {isConversationsLoading ? (
+              <div className="py-10 text-center"><span className="loading loading-spinner loading-md" /></div>
+            ) : conversations.length === 0 ? (
+              <p className="text-sm text-base-content/60">No hay conversaciones disponibles para esta compañía.</p>
+            ) : (
+              <div className="space-y-2">
+                {conversations.map((conversation) => (
+                  <button
+                    key={conversation.id}
+                    type="button"
+                    className={`w-full rounded-2xl border p-3 text-left transition ${
+                      activeConversationId === conversation.id
+                        ? 'border-primary bg-primary/8'
+                        : 'border-base-200 bg-base-50 hover:bg-base-100'
+                    }`}
+                    onClick={() => setActiveConversationId(conversation.id)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 items-start gap-2">
+                        <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-green-100 text-green-600">
+                          <FaWhatsapp className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-semibold truncate">{conversation.contact_name || conversation.contact_phone || 'Sin nombre'}</div>
+                          <div className="text-xs text-base-content/60 truncate">{conversation.contact_phone || 'Sin teléfono'}</div>
+                          <div className="mt-1">
+                            {conversation.client?.client_type === 'person' && (
+                              <span className="badge badge-info badge-xs">Persona</span>
+                            )}
+                            {conversation.client?.client_type === 'company' && (
+                              <span className="badge badge-secondary badge-xs">
+                                Empresa: {conversation.client?.name || 'Sin nombre'}
+                              </span>
+                            )}
+                            {!conversation.client?.client_type && (
+                              <span className="badge badge-ghost badge-xs">Contacto</span>
+                            )}
+                          </div>
                         </div>
                       </div>
+                      {Number(conversation.unread_count || 0) > 0 && (
+                        <span className="badge badge-primary badge-sm">{conversation.unread_count}</span>
+                      )}
                     </div>
-                    {Number(conversation.unread_count || 0) > 0 && (
-                      <span className="badge badge-primary badge-sm">{conversation.unread_count}</span>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </aside>
-
-        <div className="rounded-3xl border border-base-200 bg-base-100 p-4 shadow h-[560px] flex flex-col">
-          <div className="border-b border-base-200 pb-3 mb-3">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600">
-                <FaWhatsapp className="h-5 w-5" />
+                  </button>
+                ))}
               </div>
-              <div>
-                <h2 className="text-lg font-semibold">
-                  {activeConversation?.contact_name || activeConversation?.contact_phone || 'Selecciona un chat'}
-                </h2>
-                <p className="text-sm text-base-content/60">
-                  {activeConversation?.contact_phone || 'No hay conversación activa'}
-                </p>
-                {activeConversation && (
-                  <p className="mt-1 text-xs text-base-content/70">{activeClientLabel}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div ref={messagesContainerRef} className="flex-1 overflow-auto space-y-3 pr-1">
-            {isMessagesLoading ? (
-              <div className="py-10 text-center"><span className="loading loading-spinner loading-md" /></div>
-            ) : messages.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-base-content/60">
-                No hay mensajes para mostrar.
-              </div>
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
-                    message.direction === 'outbound'
-                      ? 'ml-auto bg-primary text-primary-content'
-                      : 'bg-base-200 text-base-content'
-                  }`}
-                >
-                  <div>{message.body}</div>
-                  <div className={`mt-1 text-[11px] ${message.direction === 'outbound' ? 'text-primary-content/80' : 'text-base-content/60'}`}>
-                    {message.sent_at ? new Date(message.sent_at).toLocaleString() : ''}
-                  </div>
-                </div>
-              ))
             )}
-          </div>
+          </aside>
 
-          <div className="mt-3 space-y-3">
+          <div className="rounded-3xl border border-base-200 bg-base-100 p-4 shadow h-[560px] flex flex-col">
+            <div className="border-b border-base-200 pb-3 mb-3">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600">
+                  <FaWhatsapp className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    {activeConversation?.contact_name || activeConversation?.contact_phone || 'Selecciona un chat'}
+                  </h2>
+                  <p className="text-sm text-base-content/60">
+                    {activeConversation?.contact_phone || 'No hay conversación activa'}
+                  </p>
+                  {activeConversation && (
+                    <p className="mt-1 text-xs text-base-content/70">{activeClientLabel}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div ref={messagesContainerRef} className="flex-1 overflow-auto space-y-3 pr-1">
+              {isMessagesLoading ? (
+                <div className="py-10 text-center"><span className="loading loading-spinner loading-md" /></div>
+              ) : messages.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-sm text-base-content/60">
+                  No hay mensajes para mostrar.
+                </div>
+              ) : (
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
+                      message.direction === 'outbound'
+                        ? 'ml-auto bg-primary text-primary-content'
+                        : 'bg-base-200 text-base-content'
+                    }`}
+                  >
+                    <div>{message.body}</div>
+                    <div className={`mt-1 text-[11px] ${message.direction === 'outbound' ? 'text-primary-content/80' : 'text-base-content/60'}`}>
+                      {message.sent_at ? new Date(message.sent_at).toLocaleString() : ''}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-3 space-y-3">
+              <div className="tabs tabs-boxed w-fit">
+                <button
+                  type="button"
+                  className={`tab ${sendMode === 'text' ? 'tab-active' : ''}`}
+                  onClick={() => setSendMode('text')}
+                >
+                  Texto
+                </button>
+                <button
+                  type="button"
+                  className={`tab ${sendMode === 'template' ? 'tab-active' : ''}`}
+                  onClick={() => setSendMode('template')}
+                >
+                  Plantilla
+                </button>
+              </div>
+
+              {sendMode === 'template' ? (
+                <div className="space-y-3 rounded-2xl border border-base-200 p-3">
+                  <label className="form-control w-full">
+                    <span className="label-text mb-2">Plantilla</span>
+                    <SearchableSelect
+                      options={availableTemplates.map((template) => ({
+                        value: `${template.name}::${template.language}`,
+                        label: `${template.label} (${template.language})`,
+                      }))}
+                      value={selectedTemplateKey}
+                      onChange={(value) => setSelectedTemplateKey(value ? String(value) : null)}
+                      placeholder="Selecciona una plantilla"
+                      isDisabled={!activeConversationId || sendingMessage || availableTemplates.length === 0}
+                      isClearable={false}
+                    />
+                  </label>
+
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    {templateVariables.map((value, index) => (
+                      <label key={`template-var-${index}`} className="form-control w-full">
+                        <span className="label-text mb-1 text-xs">Variable {`{{${index + 1}}}`}</span>
+                        <input
+                          className="input input-bordered w-full"
+                          placeholder={index === 0 ? 'Nombre del contacto' : `Valor para {{${index + 1}}}`}
+                          value={value}
+                          onChange={(event) => {
+                            const nextValues = [...templateVariables];
+                            nextValues[index] = event.target.value;
+                            setTemplateVariables(nextValues);
+                          }}
+                          disabled={!activeConversationId || sendingMessage}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-base-content/60">
+                    Por defecto, la variable {`{{1}}`} se llena con el nombre del contacto activo.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    className="input input-bordered w-full"
+                    placeholder="Escribe tu respuesta..."
+                    value={messageDraft}
+                    onChange={(event) => setMessageDraft(event.target.value)}
+                    onKeyDown={handleComposerKeyDown}
+                    disabled={!activeConversationId || sendingMessage}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleSendMessage}
+                    disabled={!activeConversationId || !messageDraft.trim() || sendingMessage}
+                  >
+                    <BiSend className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {sendMode === 'template' && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleSendMessage}
+                    disabled={!activeConversationId || !selectedTemplateKey || sendingMessage}
+                  >
+                    <BiSend className="w-4 h-4" />
+                    Enviar plantilla
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <div className="rounded-3xl border border-base-200 bg-base-100 p-5 shadow space-y-4">
+            <div className="flex items-center gap-2">
+              <BiTask className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">Centro de envíos</h3>
+            </div>
+            <p className="text-sm text-base-content/60">
+              Envía por números específicos, por empresa/cliente o por filtros geográficos (país, estado, ciudad).
+            </p>
+
             <div className="tabs tabs-boxed w-fit">
-              <button
-                type="button"
-                className={`tab ${sendMode === 'text' ? 'tab-active' : ''}`}
-                onClick={() => setSendMode('text')}
-              >
+              <button type="button" className={`tab ${broadcastSendMode === 'text' ? 'tab-active' : ''}`} onClick={() => setBroadcastSendMode('text')}>
                 Texto
               </button>
-              <button
-                type="button"
-                className={`tab ${sendMode === 'template' ? 'tab-active' : ''}`}
-                onClick={() => setSendMode('template')}
-              >
+              <button type="button" className={`tab ${broadcastSendMode === 'template' ? 'tab-active' : ''}`} onClick={() => setBroadcastSendMode('template')}>
                 Plantilla
               </button>
             </div>
 
-            {sendMode === 'template' ? (
+            {broadcastSendMode === 'template' ? (
               <div className="space-y-3 rounded-2xl border border-base-200 p-3">
                 <label className="form-control w-full">
                   <span className="label-text mb-2">Plantilla</span>
@@ -431,134 +663,159 @@ const CrmWhatsappInboxPage: React.FC = () => {
                       value: `${template.name}::${template.language}`,
                       label: `${template.label} (${template.language})`,
                     }))}
-                    value={selectedTemplateKey}
-                    onChange={(value) => setSelectedTemplateKey(value ? String(value) : null)}
+                    value={broadcastTemplateKey}
+                    onChange={(value) => setBroadcastTemplateKey(value ? String(value) : null)}
                     placeholder="Selecciona una plantilla"
-                    isDisabled={!activeConversationId || sendingMessage || availableTemplates.length === 0}
+                    isDisabled={sendingBroadcast || availableTemplates.length === 0}
                     isClearable={false}
                   />
                 </label>
-
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  {templateVariables.map((value, index) => (
-                    <label key={`template-var-${index}`} className="form-control w-full">
+                  {broadcastTemplateVariables.map((value, index) => (
+                    <label key={`broadcast-template-var-${index}`} className="form-control w-full">
                       <span className="label-text mb-1 text-xs">Variable {`{{${index + 1}}}`}</span>
                       <input
                         className="input input-bordered w-full"
-                        placeholder={index === 0 ? 'Nombre del contacto' : `Valor para {{${index + 1}}}`}
+                        placeholder={index === 0 ? 'Nombre (por defecto)' : `Valor para {{${index + 1}}}`}
                         value={value}
                         onChange={(event) => {
-                          const nextValues = [...templateVariables];
-                          nextValues[index] = event.target.value;
-                          setTemplateVariables(nextValues);
+                          const next = [...broadcastTemplateVariables];
+                          next[index] = event.target.value;
+                          setBroadcastTemplateVariables(next);
                         }}
-                        disabled={!activeConversationId || sendingMessage}
+                        disabled={sendingBroadcast}
                       />
                     </label>
                   ))}
                 </div>
-                <p className="text-xs text-base-content/60">
-                  Por defecto, la variable {`{{1}}`} se llena con el nombre del contacto activo.
-                </p>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  className="input input-bordered w-full"
-                  placeholder="Escribe tu respuesta..."
-                  value={messageDraft}
-                  onChange={(event) => setMessageDraft(event.target.value)}
-                  onKeyDown={handleComposerKeyDown}
-                  disabled={!activeConversationId || sendingMessage}
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Mensaje</span>
+                <textarea
+                  rows={4}
+                  className="textarea textarea-bordered w-full"
+                  placeholder="Hola, este es un mensaje..."
+                  value={broadcastMessage}
+                  onChange={(event) => setBroadcastMessage(event.target.value)}
                 />
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleSendMessage}
-                  disabled={!activeConversationId || !messageDraft.trim() || sendingMessage}
-                >
-                  <BiSend className="w-4 h-4" />
-                </button>
-              </div>
+              </label>
             )}
 
-            {sendMode === 'template' && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleSendMessage}
-                  disabled={!activeConversationId || !selectedTemplateKey || sendingMessage}
-                >
-                  <BiSend className="w-4 h-4" />
-                  Enviar plantilla
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <div className="rounded-3xl border border-base-200 bg-base-100 p-5 shadow space-y-3">
-          <div className="flex items-center gap-2">
-            <BiTask className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-semibold">Envío masivo</h3>
-          </div>
-          <p className="text-sm text-base-content/60">
-            Envía un mensaje a múltiples teléfonos. Escribe uno por línea o separados por coma.
-          </p>
-
-          <label className="form-control w-full">
-            <span className="label-text mb-2">Teléfonos destino</span>
-            <textarea
-              rows={5}
-              className="textarea textarea-bordered w-full"
-              placeholder="573001112233&#10;573004445566"
-              value={broadcastPhones}
-              onChange={(event) => setBroadcastPhones(event.target.value)}
-            />
-          </label>
-
-          <label className="form-control w-full">
-            <span className="label-text mb-2">Mensaje</span>
-            <textarea
-              rows={4}
-              className="textarea textarea-bordered w-full"
-              placeholder="Hola, este es un mensaje masivo..."
-              value={broadcastMessage}
-              onChange={(event) => setBroadcastMessage(event.target.value)}
-            />
-          </label>
-
-          <div className="flex justify-end">
-            <button type="button" className="btn btn-primary" onClick={handleBroadcast} disabled={sendingBroadcast}>
-              {sendingBroadcast ? 'Enviando...' : 'Enviar masivo'}
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-base-200 bg-base-100 p-5 shadow space-y-3">
-          <h3 className="text-lg font-semibold">Configuración de integración</h3>
-          <p className="text-sm text-base-content/60">
-            La configuración de llaves Meta/WhatsApp ahora se administra desde el detalle de la compañía.
-          </p>
-          <div className="rounded-2xl border border-base-200 bg-base-50 p-4">
-            <div className="text-sm text-base-content/60">Estado actual</div>
-            <div className="mt-1 flex items-center gap-2 text-sm">
-              {metaConfig?.is_configured ? <BiCheckCircle className="h-4 w-4 text-success" /> : <BiTime className="h-4 w-4 text-warning" />}
-              {metaConfig?.is_configured ? 'Configuración completa' : 'Faltan llaves de integración'}
-            </div>
-          </div>
-          {resolvedCompanyId && canReadCompanies && (
-            <div className="flex justify-end">
-              <button type="button" className="btn btn-outline" onClick={() => navigate(`/companies/${resolvedCompanyId}`)}>
-                Ir a la compañía
+            <div className="tabs tabs-boxed w-fit">
+              <button type="button" className={`tab ${isSpecificMode ? 'tab-active' : ''}`} onClick={() => setBroadcastTargetType('specific')}>
+                Números
+              </button>
+              <button type="button" className={`tab ${isClientFilterMode ? 'tab-active' : ''}`} onClick={() => setBroadcastTargetType('client')}>
+                Empresa/Cliente
+              </button>
+              <button type="button" className={`tab ${isGeoFilterMode ? 'tab-active' : ''}`} onClick={() => setBroadcastTargetType('geo')}>
+                País/Estado/Ciudad
               </button>
             </div>
-          )}
-        </div>
-      </section>
+
+            {isSpecificMode && (
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Teléfonos destino</span>
+                <textarea
+                  rows={5}
+                  className="textarea textarea-bordered w-full"
+                  placeholder="573001112233&#10;573004445566"
+                  value={broadcastPhones}
+                  onChange={(event) => setBroadcastPhones(event.target.value)}
+                />
+              </label>
+            )}
+
+            {isClientFilterMode && (
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Selecciona empresa/cliente</span>
+                <SearchableSelect
+                  options={clientOptions}
+                  value={selectedBroadcastClientId}
+                  onChange={(value) => setSelectedBroadcastClientId(value ? Number(value) : null)}
+                  placeholder="Selecciona un cliente"
+                  isClearable
+                />
+              </label>
+            )}
+
+            {isGeoFilterMode && (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <label className="form-control w-full">
+                  <span className="label-text mb-2">País</span>
+                  <SearchableSelect
+                    options={countries.map((country) => ({ value: country.id, label: country.name }))}
+                    value={broadcastCountryId}
+                    onChange={(value) => setBroadcastCountryId(value ? Number(value) : null)}
+                    placeholder="Todos"
+                    isClearable
+                  />
+                </label>
+                <label className="form-control w-full">
+                  <span className="label-text mb-2">Estado</span>
+                  <SearchableSelect
+                    options={states.map((state) => ({ value: state.id, label: state.name }))}
+                    value={broadcastStateId}
+                    onChange={(value) => setBroadcastStateId(value ? Number(value) : null)}
+                    placeholder={broadcastCountryId ? 'Todos' : 'Selecciona país'}
+                    isDisabled={!broadcastCountryId}
+                    isClearable
+                  />
+                </label>
+                <label className="form-control w-full">
+                  <span className="label-text mb-2">Ciudad</span>
+                  <SearchableSelect
+                    options={cities.map((city) => ({ value: city.id, label: city.name }))}
+                    value={broadcastCityId}
+                    onChange={(value) => setBroadcastCityId(value ? Number(value) : null)}
+                    placeholder={broadcastStateId ? 'Todas' : 'Selecciona estado'}
+                    isDisabled={!broadcastStateId}
+                    isClearable
+                  />
+                </label>
+              </div>
+            )}
+
+            <label className="flex items-center gap-2 rounded-xl border border-base-200 px-3 py-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm"
+                checked={includeClientContacts}
+                onChange={(event) => setIncludeClientContacts(event.target.checked)}
+              />
+              <span className="text-sm">Incluir también teléfonos de contactos</span>
+            </label>
+
+            <div className="flex justify-end">
+              <button type="button" className="btn btn-primary" onClick={handleBroadcast} disabled={sendingBroadcast}>
+                {sendingBroadcast ? 'Enviando...' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-base-200 bg-base-100 p-5 shadow space-y-3">
+            <h3 className="text-lg font-semibold">Configuración de integración</h3>
+            <p className="text-sm text-base-content/60">
+              La configuración de llaves Meta/WhatsApp y plantillas se administra desde el detalle de la compañía.
+            </p>
+            <div className="rounded-2xl border border-base-200 bg-base-50 p-4">
+              <div className="text-sm text-base-content/60">Estado actual</div>
+              <div className="mt-1 flex items-center gap-2 text-sm">
+                {metaConfig?.is_configured ? <BiCheckCircle className="h-4 w-4 text-success" /> : <BiTime className="h-4 w-4 text-warning" />}
+                {metaConfig?.is_configured ? 'Configuración completa' : 'Faltan llaves de integración'}
+              </div>
+            </div>
+            {resolvedCompanyId && canReadCompanies && (
+              <div className="flex justify-end">
+                <button type="button" className="btn btn-outline" onClick={() => navigate(`/companies/${resolvedCompanyId}`)}>
+                  Ir a la compañía
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 };

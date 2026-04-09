@@ -50,6 +50,14 @@ export interface WhatsappMetaConfig {
 
 export interface WhatsappBroadcastPayload {
   company_id?: number;
-  recipients: string[];
-  message: string;
+  recipients?: string[];
+  message?: string;
+  template_name?: string;
+  template_language?: string;
+  template_variables?: string[];
+  recipient_client_id?: number;
+  country_id?: number;
+  state_id?: number;
+  city_id?: number;
+  include_client_contacts?: boolean;
 }
