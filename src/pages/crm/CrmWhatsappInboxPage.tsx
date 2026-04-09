@@ -43,8 +43,10 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const [chatVariableSources, setChatVariableSources] = React.useState<string[]>([]);
   const [broadcastVariableSources, setBroadcastVariableSources] = React.useState<string[]>([]);
   const [selectedBroadcastClientId, setSelectedBroadcastClientId] = React.useState<number | null>(null);
-  const [clientContactSendMode, setClientContactSendMode] = React.useState<'all' | 'one'>('all');
-  const [selectedBroadcastContactId, setSelectedBroadcastContactId] = React.useState<number | null>(null);
+  const [broadcastClientSearch, setBroadcastClientSearch] = React.useState('');
+  const [debouncedBroadcastClientSearch, setDebouncedBroadcastClientSearch] = React.useState('');
+  const [selectedBroadcastContactIds, setSelectedBroadcastContactIds] = React.useState<number[]>([]);
+  const [includeClientPhone, setIncludeClientPhone] = React.useState(true);
   const [includeClientContacts, setIncludeClientContacts] = React.useState(true);
   const [broadcastCountryId, setBroadcastCountryId] = React.useState<number | null>(null);
   const [broadcastStateId, setBroadcastStateId] = React.useState<number | null>(null);
@@ -121,9 +123,22 @@ const CrmWhatsappInboxPage: React.FC = () => {
     retry: false,
   });
 
+  React.useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedBroadcastClientSearch(broadcastClientSearch.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [broadcastClientSearch]);
+
   const { data: clientsData } = useQuery({
-    queryKey: ['clients-for-whatsapp-broadcast', resolvedCompanyId],
-    queryFn: () => clientService.getClients({ company_id: resolvedCompanyId ?? undefined, per_page: 200 }),
+    queryKey: ['clients-for-whatsapp-broadcast', resolvedCompanyId, debouncedBroadcastClientSearch],
+    queryFn: () =>
+      clientService.getClients({
+        company_id: resolvedCompanyId ?? undefined,
+        per_page: 25,
+        search: debouncedBroadcastClientSearch || undefined,
+      }),
     enabled: Boolean(resolvedCompanyId),
     retry: false,
   });
@@ -266,13 +281,12 @@ const CrmWhatsappInboxPage: React.FC = () => {
   }, [clientsData?.data, selectedBroadcastClientId]);
 
   React.useEffect(() => {
-    setSelectedBroadcastContactId(null);
-    setClientContactSendMode('all');
+    setSelectedBroadcastContactIds([]);
   }, [selectedBroadcastClientId]);
 
   const selectedCompanyName = (companiesData?.data ?? []).find((item) => item.id === resolvedCompanyId)?.name || '';
   const selectedBroadcastClient = (clientsData?.data ?? []).find((item) => item.id === selectedBroadcastClientId);
-  const selectedBroadcastContact = broadcastClientContacts.find((item) => item.id === selectedBroadcastContactId);
+  const selectedBroadcastContact = broadcastClientContacts.find((item) => item.id === selectedBroadcastContactIds[0]);
   const selectedCountryName = countries.find((item) => item.id === broadcastCountryId)?.name || '';
   const selectedStateName = states.find((item) => item.id === broadcastStateId)?.name || '';
   const selectedCityName = cities.find((item) => item.id === broadcastCityId)?.name || '';
@@ -392,9 +406,12 @@ const CrmWhatsappInboxPage: React.FC = () => {
       state_id?: number;
       city_id?: number;
       include_client_contacts?: boolean;
+      include_client_phone?: boolean;
+      recipient_contact_ids?: number[];
     } = {
       company_id: resolvedCompanyId,
       include_client_contacts: includeClientContacts,
+      include_client_phone: includeClientPhone,
     };
 
     if (broadcastSendMode === 'template') {
@@ -430,12 +447,16 @@ const CrmWhatsappInboxPage: React.FC = () => {
         return;
       }
       payload.recipient_client_id = selectedBroadcastClientId;
-      if (clientContactSendMode === 'one') {
-        if (!selectedBroadcastContactId) {
-          toast.error('Selecciona el contacto específico');
-          return;
-        }
-        payload.recipient_contact_id = selectedBroadcastContactId;
+      if (selectedBroadcastContactIds.length > 0) {
+        payload.recipient_contact_ids = selectedBroadcastContactIds;
+      }
+      if (!includeClientPhone && !includeClientContacts) {
+        toast.error('Activa teléfono principal o contactos para tener destinatarios');
+        return;
+      }
+      if (!includeClientPhone && includeClientContacts && selectedBroadcastContactIds.length === 0 && broadcastClientContacts.length === 0) {
+        toast.error('La empresa/cliente no tiene contactos para enviar');
+        return;
       }
     } else {
       if (!broadcastCountryId && !broadcastStateId && !broadcastCityId) {
@@ -475,13 +496,10 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const clientOptions = (clientsData?.data ?? [])
     .map((client) => ({
       value: client.id,
-      label: `${client.name}${client.phone ? ` · ${client.phone}` : ''}`,
+      label: `${client.name}${client.client_type === 'company' ? ' · Empresa' : client.client_type === 'person' ? ' · Persona' : ''}${client.phone ? ` · ${client.phone}` : ''}`,
     }));
-  const clientContactOptions = (broadcastClientContacts ?? [])
-    .map((contact) => ({
-      value: contact.id,
-      label: `${contact.name}${contact.phone ? ` · ${contact.phone}` : ''}`,
-    }));
+  const allBroadcastContactIds = (broadcastClientContacts ?? []).map((contact) => contact.id);
+  const allContactsSelected = allBroadcastContactIds.length > 0 && allBroadcastContactIds.every((id) => selectedBroadcastContactIds.includes(id));
   const buildTemplatePreview = (templateKey: string | null, values: string[], bodyText?: string) => {
     if (!templateKey) return 'Selecciona una plantilla para ver la vista previa.';
     if (!bodyText?.trim()) {
@@ -976,6 +994,19 @@ const CrmWhatsappInboxPage: React.FC = () => {
                   {isClientFilterMode && (
                     <div className="space-y-3">
                       <label className="form-control w-full">
+                        <span className="label-text mb-2">Buscar empresa/cliente</span>
+                        <input
+                          className="input input-bordered w-full"
+                          value={broadcastClientSearch}
+                          onChange={(event) => setBroadcastClientSearch(event.target.value)}
+                          placeholder="Escribe nombre, correo, NIT o teléfono"
+                        />
+                        <span className="mt-1 text-xs text-base-content/60">
+                          Se muestran resultados mientras escribes.
+                        </span>
+                      </label>
+
+                      <label className="form-control w-full">
                         <span className="label-text mb-2">Selecciona empresa/cliente</span>
                         <SearchableSelect
                           options={clientOptions}
@@ -988,35 +1019,83 @@ const CrmWhatsappInboxPage: React.FC = () => {
 
                       {selectedBroadcastClientId && (
                         <>
-                          <div className="tabs tabs-boxed w-fit">
-                            <button
-                              type="button"
-                              className={`tab ${clientContactSendMode === 'all' ? 'tab-active' : ''}`}
-                              onClick={() => setClientContactSendMode('all')}
-                            >
-                              Todos los contactos
-                            </button>
-                            <button
-                              type="button"
-                              className={`tab ${clientContactSendMode === 'one' ? 'tab-active' : ''}`}
-                              onClick={() => setClientContactSendMode('one')}
-                            >
-                              Un contacto
-                            </button>
-                          </div>
-
-                          {clientContactSendMode === 'one' && (
-                            <label className="form-control w-full">
-                              <span className="label-text mb-2">Contacto específico</span>
-                              <SearchableSelect
-                                options={clientContactOptions}
-                                value={selectedBroadcastContactId}
-                                onChange={(value) => setSelectedBroadcastContactId(value ? Number(value) : null)}
-                                placeholder="Selecciona un contacto"
-                                isClearable
+                          <div className="rounded-xl border border-base-200 p-3 space-y-3">
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="checkbox checkbox-sm"
+                                checked={includeClientPhone}
+                                onChange={(event) => setIncludeClientPhone(event.target.checked)}
                               />
+                              <span className="text-sm">Incluir teléfono principal del cliente</span>
                             </label>
-                          )}
+
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="checkbox checkbox-sm"
+                                checked={includeClientContacts}
+                                onChange={(event) => setIncludeClientContacts(event.target.checked)}
+                              />
+                              <span className="text-sm">Incluir contactos de la empresa/cliente</span>
+                            </label>
+
+                            {includeClientContacts && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-sm font-medium">Contactos ({broadcastClientContacts.length})</span>
+                                  {broadcastClientContacts.length > 0 && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-xs btn-outline"
+                                      onClick={() => {
+                                        if (allContactsSelected) {
+                                          setSelectedBroadcastContactIds([]);
+                                          return;
+                                        }
+                                        setSelectedBroadcastContactIds(allBroadcastContactIds);
+                                      }}
+                                    >
+                                      {allContactsSelected ? 'Quitar todos' : 'Seleccionar todos'}
+                                    </button>
+                                  )}
+                                </div>
+
+                                {broadcastClientContacts.length === 0 ? (
+                                  <p className="text-xs text-base-content/60">No hay contactos registrados para este cliente.</p>
+                                ) : (
+                                  <div className="max-h-44 overflow-auto space-y-1">
+                                    {broadcastClientContacts.map((contact) => {
+                                      const checked = selectedBroadcastContactIds.includes(contact.id);
+                                      return (
+                                        <label key={contact.id} className="flex items-center gap-2 rounded-lg border border-base-200 px-2 py-1.5">
+                                          <input
+                                            type="checkbox"
+                                            className="checkbox checkbox-xs"
+                                            checked={checked}
+                                            onChange={(event) => {
+                                              if (event.target.checked) {
+                                                setSelectedBroadcastContactIds((prev) => [...prev, contact.id]);
+                                                return;
+                                              }
+                                              setSelectedBroadcastContactIds((prev) => prev.filter((id) => id !== contact.id));
+                                            }}
+                                          />
+                                          <span className="text-sm">
+                                            {contact.name}
+                                            {contact.phone ? ` · ${contact.phone}` : ''}
+                                          </span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                <p className="text-xs text-base-content/60">
+                                  Si no marcas contactos, se enviará a todos los contactos del cliente.
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </>
                       )}
                     </div>
@@ -1059,15 +1138,17 @@ const CrmWhatsappInboxPage: React.FC = () => {
                     </div>
                   )}
 
-                  <label className="flex items-center gap-2 rounded-xl border border-base-200 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-sm"
-                      checked={includeClientContacts}
-                      onChange={(event) => setIncludeClientContacts(event.target.checked)}
-                    />
-                    <span className="text-sm">Incluir también teléfonos de contactos</span>
-                  </label>
+                  {!isClientFilterMode && (
+                    <label className="flex items-center gap-2 rounded-xl border border-base-200 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={includeClientContacts}
+                        onChange={(event) => setIncludeClientContacts(event.target.checked)}
+                      />
+                      <span className="text-sm">Incluir también teléfonos de contactos</span>
+                    </label>
+                  )}
 
                   <div className="flex justify-end">
                     <button type="button" className="btn btn-primary" onClick={handleBroadcast} disabled={sendingBroadcast}>
