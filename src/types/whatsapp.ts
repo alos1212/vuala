@@ -61,6 +61,7 @@ export interface WhatsappBroadcastPayload {
   template_name?: string;
   template_language?: string;
   template_variables?: string[];
+  template_variable_sources?: string[];
   recipient_client_id?: number;
   recipient_contact_id?: number;
   recipient_contact_ids?: number[];

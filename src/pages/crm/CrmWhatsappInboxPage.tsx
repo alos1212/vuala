@@ -401,6 +401,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
       template_name?: string;
       template_language?: string;
       template_variables?: string[];
+      template_variable_sources?: string[];
       recipient_client_id?: number;
       country_id?: number;
       state_id?: number;
@@ -423,6 +424,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
       payload.template_name = templateName;
       payload.template_language = templateLanguage || 'es_CO';
       payload.template_variables = [...broadcastTemplateVariables];
+      payload.template_variable_sources = [...broadcastVariableSources];
     } else {
       if (!broadcastMessage.trim()) {
         toast.error('Escribe el mensaje para enviar');

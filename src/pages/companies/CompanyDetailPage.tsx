@@ -79,6 +79,7 @@ const CompanyDetailPage: React.FC = () => {
     label: '',
     is_active: true,
   });
+  const [activeTab, setActiveTab] = React.useState<'general' | 'users' | 'categories' | 'whatsapp'>('general');
   const { id } = useParams<{ id: string }>();
   const companyId = Number(id);
   const hasPermission = useAuthStore((state) => state.hasPermission);
@@ -538,7 +539,29 @@ const CompanyDetailPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+      <section className="rounded-3xl border border-base-200 bg-base-100 p-3 shadow-sm">
+        <div className="tabs tabs-boxed flex-wrap gap-2 bg-transparent">
+          <button type="button" className={`tab ${activeTab === 'general' ? 'tab-active' : ''}`} onClick={() => setActiveTab('general')}>
+            Información
+          </button>
+          <button type="button" className={`tab ${activeTab === 'users' ? 'tab-active' : ''}`} onClick={() => setActiveTab('users')}>
+            Usuarios
+          </button>
+          {(canListCategories || canCreateCategories || canUpdateCategories) && (
+            <button type="button" className={`tab ${activeTab === 'categories' ? 'tab-active' : ''}`} onClick={() => setActiveTab('categories')}>
+              Categorías
+            </button>
+          )}
+          {canReadWhatsappConfig && (
+            <button type="button" className={`tab ${activeTab === 'whatsapp' ? 'tab-active' : ''}`} onClick={() => setActiveTab('whatsapp')}>
+              WhatsApp
+            </button>
+          )}
+        </div>
+      </section>
+
+      {activeTab === 'general' && (
+        <div className="grid grid-cols-1 gap-6">
         <section className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow">
           <div className="mb-5 flex items-center justify-between">
             <div>
@@ -611,7 +634,10 @@ const CompanyDetailPage: React.FC = () => {
             </div>
           </div>
         </section>
+        </div>
+      )}
 
+      {activeTab === 'users' && (
         <section className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow">
           <div className="mb-5 flex items-center justify-between">
             <div>
@@ -769,40 +795,9 @@ const CompanyDetailPage: React.FC = () => {
             </div>
           )}
         </section>
-      </div>
+      )}
 
-      <section className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-xl font-semibold">Clientes</h2>
-            <p className="text-sm text-base-content/60">Clientes pertenecientes a esta compañía.</p>
-          </div>
-          <button className="btn btn-outline btn-sm" onClick={() => navigate(`/clients/create?company_id=${company.id}`)}>
-            Nuevo cliente
-          </button>
-        </div>
-
-        {clients.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-base-300 p-5 text-base-content/60">
-            No hay clientes registrados para esta compañía.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {clients.map((client) => (
-              <button
-                key={client.id}
-                className="rounded-2xl border border-base-200 bg-base-50 px-4 py-4 text-left transition hover:-translate-y-0.5 hover:bg-base-100 hover:shadow-md"
-                onClick={() => navigate(`/clients/${client.id}`)}
-              >
-                <div className="font-semibold">{client.name}</div>
-                <div className="text-sm text-base-content/60">{client.email || client.phone || 'Sin contacto principal'}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {(canListCategories || canCreateCategories || canUpdateCategories) && (
+      {(canListCategories || canCreateCategories || canUpdateCategories) && activeTab === 'categories' && (
         <section className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -851,7 +846,7 @@ const CompanyDetailPage: React.FC = () => {
         </section>
       )}
 
-      {canReadWhatsappConfig && (
+      {canReadWhatsappConfig && activeTab === 'whatsapp' && (
         <section className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow space-y-4">
           <div>
             <h2 className="text-xl font-semibold">Configuración WhatsApp (Meta)</h2>
