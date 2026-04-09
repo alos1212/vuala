@@ -366,6 +366,15 @@ const CrmWhatsappInboxPage: React.FC = () => {
       value: client.id,
       label: `${client.name}${client.phone ? ` · ${client.phone}` : ''}`,
     }));
+  const buildTemplatePreview = (templateKey: string | null, values: string[]) => {
+    if (!templateKey) return 'Selecciona una plantilla para ver la vista previa.';
+    const selected = availableTemplates.find((template) => `${template.name}::${template.language}` === templateKey);
+    const nonEmptyValues = values.map((value) => value.trim()).filter(Boolean);
+    if (nonEmptyValues.length > 0) {
+      return nonEmptyValues.join(' | ');
+    }
+    return selected?.label || 'Mensaje automático';
+  };
   const totalUnread = conversations.reduce((sum, item) => sum + Number(item.unread_count || 0), 0);
   const isGeoFilterMode = broadcastTargetType === 'geo';
   const isClientFilterMode = broadcastTargetType === 'client';
@@ -596,6 +605,10 @@ const CrmWhatsappInboxPage: React.FC = () => {
                   <p className="text-xs text-base-content/60">
                     Por defecto, la variable {`{{1}}`} se llena con el nombre del contacto activo.
                   </p>
+                  <div className="rounded-xl border border-base-200 bg-base-50 px-3 py-2 text-sm">
+                    <div className="text-xs text-base-content/60 mb-1">Vista previa</div>
+                    <div>{buildTemplatePreview(selectedTemplateKey, templateVariables)}</div>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -687,6 +700,10 @@ const CrmWhatsappInboxPage: React.FC = () => {
                       />
                     </label>
                   ))}
+                </div>
+                <div className="rounded-xl border border-base-200 bg-base-50 px-3 py-2 text-sm">
+                  <div className="text-xs text-base-content/60 mb-1">Vista previa</div>
+                  <div>{buildTemplatePreview(broadcastTemplateKey, broadcastTemplateVariables)}</div>
                 </div>
               </div>
             ) : (
