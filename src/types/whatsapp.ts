@@ -44,6 +44,12 @@ export interface WhatsappMetaConfig {
     language?: string | null;
     label?: string | null;
     is_active?: boolean;
+    body?: string | null;
+    body_text?: string | null;
+    components?: Array<{
+      type?: string | null;
+      text?: string | null;
+    }>;
   }>;
   updated_at?: string | null;
 }

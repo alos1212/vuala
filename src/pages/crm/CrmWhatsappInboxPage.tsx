@@ -157,6 +157,8 @@ const CrmWhatsappInboxPage: React.FC = () => {
         name: String(template.name),
         language: String(template.language || 'es_CO'),
         label: String(template.label || template.name),
+        body: String(template.body_text || template.body || ''),
+        components: Array.isArray(template.components) ? template.components : [],
       }));
   }, [metaConfig?.templates]);
 
@@ -366,19 +368,45 @@ const CrmWhatsappInboxPage: React.FC = () => {
       value: client.id,
       label: `${client.name}${client.phone ? ` · ${client.phone}` : ''}`,
     }));
+  const extractTemplateBody = (template: {
+    body?: string;
+    components?: Array<{ type?: string | null; text?: string | null }>;
+  }): string => {
+    if (template.body?.trim()) return template.body.trim();
+    const bodyComponent = (template.components || []).find((component) => String(component?.type || '').toUpperCase() === 'BODY');
+    if (bodyComponent?.text?.trim()) return bodyComponent.text.trim();
+    return '';
+  };
+
   const buildTemplatePreview = (templateKey: string | null, values: string[]) => {
     if (!templateKey) return 'Selecciona una plantilla para ver la vista previa.';
     const selected = availableTemplates.find((template) => `${template.name}::${template.language}` === templateKey);
-    const nonEmptyValues = values.map((value) => value.trim()).filter(Boolean);
-    if (nonEmptyValues.length > 0) {
-      return nonEmptyValues.join(' | ');
+
+    if (!selected) return 'No se encontró la plantilla seleccionada.';
+
+    const templateBody = extractTemplateBody(selected);
+    if (!templateBody) {
+      const nonEmptyValues = values.map((value) => value.trim()).filter(Boolean);
+      if (nonEmptyValues.length > 0) {
+        return nonEmptyValues.join(' | ');
+      }
+      return selected.label || 'Mensaje automático';
     }
-    return selected?.label || 'Mensaje automático';
+
+    return templateBody.replace(/\{\{\s*(\d+)\s*\}\}/g, (_match, indexText: string) => {
+      const variableIndex = Number(indexText) - 1;
+      const resolvedValue = values[variableIndex]?.trim();
+      return resolvedValue || `{{${indexText}}}`;
+    });
   };
   const totalUnread = conversations.reduce((sum, item) => sum + Number(item.unread_count || 0), 0);
   const isGeoFilterMode = broadcastTargetType === 'geo';
   const isClientFilterMode = broadcastTargetType === 'client';
   const isSpecificMode = broadcastTargetType === 'specific';
+  const segmentedTabBaseClass =
+    'inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
+  const segmentedTabActiveClass = 'bg-base-100 text-primary shadow-sm';
+  const segmentedTabInactiveClass = 'text-base-content/70 hover:bg-base-100/70 hover:text-base-content';
 
   return (
     <div className="p-6 space-y-6">
@@ -439,11 +467,19 @@ const CrmWhatsappInboxPage: React.FC = () => {
           </label>
         </div>
 
-        <div className="tabs tabs-boxed w-fit">
-          <button type="button" className={`tab ${activeTab === 'chat' ? 'tab-active' : ''}`} onClick={() => setActiveTab('chat')}>
+        <div className="inline-grid w-full grid-cols-2 rounded-2xl bg-base-200/70 p-1 md:w-fit">
+          <button
+            type="button"
+            className={`${segmentedTabBaseClass} ${activeTab === 'chat' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
+            onClick={() => setActiveTab('chat')}
+          >
             Chats
           </button>
-          <button type="button" className={`tab ${activeTab === 'send' ? 'tab-active' : ''}`} onClick={() => setActiveTab('send')}>
+          <button
+            type="button"
+            className={`${segmentedTabBaseClass} ${activeTab === 'send' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
+            onClick={() => setActiveTab('send')}
+          >
             Envíos
           </button>
         </div>
@@ -550,17 +586,17 @@ const CrmWhatsappInboxPage: React.FC = () => {
             </div>
 
             <div className="mt-3 space-y-3">
-              <div className="tabs tabs-boxed w-fit">
+              <div className="inline-grid w-full grid-cols-2 rounded-2xl bg-base-200/70 p-1 md:w-fit">
                 <button
                   type="button"
-                  className={`tab ${sendMode === 'text' ? 'tab-active' : ''}`}
+                  className={`${segmentedTabBaseClass} ${sendMode === 'text' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
                   onClick={() => setSendMode('text')}
                 >
                   Texto
                 </button>
                 <button
                   type="button"
-                  className={`tab ${sendMode === 'template' ? 'tab-active' : ''}`}
+                  className={`${segmentedTabBaseClass} ${sendMode === 'template' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
                   onClick={() => setSendMode('template')}
                 >
                   Plantilla
@@ -607,7 +643,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
                   </p>
                   <div className="rounded-xl border border-base-200 bg-base-50 px-3 py-2 text-sm">
                     <div className="text-xs text-base-content/60 mb-1">Vista previa</div>
-                    <div>{buildTemplatePreview(selectedTemplateKey, templateVariables)}</div>
+                    <div className="whitespace-pre-wrap">{buildTemplatePreview(selectedTemplateKey, templateVariables)}</div>
                   </div>
                 </div>
               ) : (
@@ -658,11 +694,19 @@ const CrmWhatsappInboxPage: React.FC = () => {
               Envía por números específicos, por empresa/cliente o por filtros geográficos (país, estado, ciudad).
             </p>
 
-            <div className="tabs tabs-boxed w-fit">
-              <button type="button" className={`tab ${broadcastSendMode === 'text' ? 'tab-active' : ''}`} onClick={() => setBroadcastSendMode('text')}>
+            <div className="inline-grid w-full grid-cols-2 rounded-2xl bg-base-200/70 p-1 md:w-fit">
+              <button
+                type="button"
+                className={`${segmentedTabBaseClass} ${broadcastSendMode === 'text' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
+                onClick={() => setBroadcastSendMode('text')}
+              >
                 Texto
               </button>
-              <button type="button" className={`tab ${broadcastSendMode === 'template' ? 'tab-active' : ''}`} onClick={() => setBroadcastSendMode('template')}>
+              <button
+                type="button"
+                className={`${segmentedTabBaseClass} ${broadcastSendMode === 'template' ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
+                onClick={() => setBroadcastSendMode('template')}
+              >
                 Plantilla
               </button>
             </div>
@@ -703,7 +747,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
                 </div>
                 <div className="rounded-xl border border-base-200 bg-base-50 px-3 py-2 text-sm">
                   <div className="text-xs text-base-content/60 mb-1">Vista previa</div>
-                  <div>{buildTemplatePreview(broadcastTemplateKey, broadcastTemplateVariables)}</div>
+                  <div className="whitespace-pre-wrap">{buildTemplatePreview(broadcastTemplateKey, broadcastTemplateVariables)}</div>
                 </div>
               </div>
             ) : (
@@ -719,14 +763,26 @@ const CrmWhatsappInboxPage: React.FC = () => {
               </label>
             )}
 
-            <div className="tabs tabs-boxed w-fit">
-              <button type="button" className={`tab ${isSpecificMode ? 'tab-active' : ''}`} onClick={() => setBroadcastTargetType('specific')}>
+            <div className="inline-grid w-full grid-cols-1 gap-1 rounded-2xl bg-base-200/70 p-1 md:w-fit md:grid-cols-3">
+              <button
+                type="button"
+                className={`${segmentedTabBaseClass} ${isSpecificMode ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
+                onClick={() => setBroadcastTargetType('specific')}
+              >
                 Números
               </button>
-              <button type="button" className={`tab ${isClientFilterMode ? 'tab-active' : ''}`} onClick={() => setBroadcastTargetType('client')}>
+              <button
+                type="button"
+                className={`${segmentedTabBaseClass} ${isClientFilterMode ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
+                onClick={() => setBroadcastTargetType('client')}
+              >
                 Empresa/Cliente
               </button>
-              <button type="button" className={`tab ${isGeoFilterMode ? 'tab-active' : ''}`} onClick={() => setBroadcastTargetType('geo')}>
+              <button
+                type="button"
+                className={`${segmentedTabBaseClass} ${isGeoFilterMode ? segmentedTabActiveClass : segmentedTabInactiveClass}`}
+                onClick={() => setBroadcastTargetType('geo')}
+              >
                 País/Estado/Ciudad
               </button>
             </div>
