@@ -336,6 +336,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
         payload.template_name = templateName;
         payload.template_language = templateLanguage || 'es_CO';
         payload.template_variables = [...templateVariables];
+        payload.message = buildTemplatePreview(selectedTemplateKey, templateVariables);
       } else {
         payload.message = messageDraft.trim();
       }
@@ -391,6 +392,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
       payload.template_name = templateName;
       payload.template_language = templateLanguage || 'es_CO';
       payload.template_variables = [...broadcastTemplateVariables];
+      payload.message = buildTemplatePreview(broadcastTemplateKey, broadcastTemplateVariables);
     } else {
       if (!broadcastMessage.trim()) {
         toast.error('Escribe el mensaje para enviar');
