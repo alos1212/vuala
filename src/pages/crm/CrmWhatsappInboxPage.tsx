@@ -43,6 +43,8 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const [chatVariableSources, setChatVariableSources] = React.useState<string[]>([]);
   const [broadcastVariableSources, setBroadcastVariableSources] = React.useState<string[]>([]);
   const [selectedBroadcastClientId, setSelectedBroadcastClientId] = React.useState<number | null>(null);
+  const [clientContactSendMode, setClientContactSendMode] = React.useState<'all' | 'one'>('all');
+  const [selectedBroadcastContactId, setSelectedBroadcastContactId] = React.useState<number | null>(null);
   const [includeClientContacts, setIncludeClientContacts] = React.useState(true);
   const [broadcastCountryId, setBroadcastCountryId] = React.useState<number | null>(null);
   const [broadcastStateId, setBroadcastStateId] = React.useState<number | null>(null);
@@ -123,6 +125,12 @@ const CrmWhatsappInboxPage: React.FC = () => {
     queryKey: ['clients-for-whatsapp-broadcast', resolvedCompanyId],
     queryFn: () => clientService.getClients({ company_id: resolvedCompanyId ?? undefined, per_page: 200 }),
     enabled: Boolean(resolvedCompanyId),
+    retry: false,
+  });
+  const { data: broadcastClientContacts = [] } = useQuery({
+    queryKey: ['client-contacts-for-broadcast', selectedBroadcastClientId],
+    queryFn: () => clientService.getContacts(selectedBroadcastClientId as number),
+    enabled: Boolean(selectedBroadcastClientId),
     retry: false,
   });
 
@@ -257,8 +265,14 @@ const CrmWhatsappInboxPage: React.FC = () => {
     });
   }, [clientsData?.data, selectedBroadcastClientId]);
 
+  React.useEffect(() => {
+    setSelectedBroadcastContactId(null);
+    setClientContactSendMode('all');
+  }, [selectedBroadcastClientId]);
+
   const selectedCompanyName = (companiesData?.data ?? []).find((item) => item.id === resolvedCompanyId)?.name || '';
   const selectedBroadcastClient = (clientsData?.data ?? []).find((item) => item.id === selectedBroadcastClientId);
+  const selectedBroadcastContact = broadcastClientContacts.find((item) => item.id === selectedBroadcastContactId);
   const selectedCountryName = countries.find((item) => item.id === broadcastCountryId)?.name || '';
   const selectedStateName = states.find((item) => item.id === broadcastStateId)?.name || '';
   const selectedCityName = cities.find((item) => item.id === broadcastCityId)?.name || '';
@@ -293,7 +307,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
       return '';
     }
 
-    if (source === 'contact_name') return selectedBroadcastClient?.name || '';
+    if (source === 'contact_name') return selectedBroadcastContact?.name || selectedBroadcastClient?.name || '';
     if (source === 'company_name') return selectedCompanyName;
     if (source === 'country') return selectedCountryName;
     if (source === 'state') return selectedStateName;
@@ -392,7 +406,6 @@ const CrmWhatsappInboxPage: React.FC = () => {
       payload.template_name = templateName;
       payload.template_language = templateLanguage || 'es_CO';
       payload.template_variables = [...broadcastTemplateVariables];
-      payload.message = buildTemplatePreview(broadcastTemplateKey, broadcastTemplateVariables);
     } else {
       if (!broadcastMessage.trim()) {
         toast.error('Escribe el mensaje para enviar');
@@ -417,6 +430,13 @@ const CrmWhatsappInboxPage: React.FC = () => {
         return;
       }
       payload.recipient_client_id = selectedBroadcastClientId;
+      if (clientContactSendMode === 'one') {
+        if (!selectedBroadcastContactId) {
+          toast.error('Selecciona el contacto específico');
+          return;
+        }
+        payload.recipient_contact_id = selectedBroadcastContactId;
+      }
     } else {
       if (!broadcastCountryId && !broadcastStateId && !broadcastCityId) {
         toast.error('Selecciona al menos país, estado o ciudad');
@@ -456,6 +476,11 @@ const CrmWhatsappInboxPage: React.FC = () => {
     .map((client) => ({
       value: client.id,
       label: `${client.name}${client.phone ? ` · ${client.phone}` : ''}`,
+    }));
+  const clientContactOptions = (broadcastClientContacts ?? [])
+    .map((contact) => ({
+      value: contact.id,
+      label: `${contact.name}${contact.phone ? ` · ${contact.phone}` : ''}`,
     }));
   const buildTemplatePreview = (templateKey: string | null, values: string[], bodyText?: string) => {
     if (!templateKey) return 'Selecciona una plantilla para ver la vista previa.';
@@ -949,16 +974,52 @@ const CrmWhatsappInboxPage: React.FC = () => {
                   )}
 
                   {isClientFilterMode && (
-                    <label className="form-control w-full">
-                      <span className="label-text mb-2">Selecciona empresa/cliente</span>
-                      <SearchableSelect
-                        options={clientOptions}
-                        value={selectedBroadcastClientId}
-                        onChange={(value) => setSelectedBroadcastClientId(value ? Number(value) : null)}
-                        placeholder="Selecciona un cliente"
-                        isClearable
-                      />
-                    </label>
+                    <div className="space-y-3">
+                      <label className="form-control w-full">
+                        <span className="label-text mb-2">Selecciona empresa/cliente</span>
+                        <SearchableSelect
+                          options={clientOptions}
+                          value={selectedBroadcastClientId}
+                          onChange={(value) => setSelectedBroadcastClientId(value ? Number(value) : null)}
+                          placeholder="Selecciona un cliente"
+                          isClearable
+                        />
+                      </label>
+
+                      {selectedBroadcastClientId && (
+                        <>
+                          <div className="tabs tabs-boxed w-fit">
+                            <button
+                              type="button"
+                              className={`tab ${clientContactSendMode === 'all' ? 'tab-active' : ''}`}
+                              onClick={() => setClientContactSendMode('all')}
+                            >
+                              Todos los contactos
+                            </button>
+                            <button
+                              type="button"
+                              className={`tab ${clientContactSendMode === 'one' ? 'tab-active' : ''}`}
+                              onClick={() => setClientContactSendMode('one')}
+                            >
+                              Un contacto
+                            </button>
+                          </div>
+
+                          {clientContactSendMode === 'one' && (
+                            <label className="form-control w-full">
+                              <span className="label-text mb-2">Contacto específico</span>
+                              <SearchableSelect
+                                options={clientContactOptions}
+                                value={selectedBroadcastContactId}
+                                onChange={(value) => setSelectedBroadcastContactId(value ? Number(value) : null)}
+                                placeholder="Selecciona un contacto"
+                                isClearable
+                              />
+                            </label>
+                          )}
+                        </>
+                      )}
+                    </div>
                   )}
 
                   {isGeoFilterMode && (
