@@ -21,7 +21,10 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const [selectedCompanyId, setSelectedCompanyId] = React.useState<number | null>(userCompanyId ?? null);
   const [searchConversation, setSearchConversation] = React.useState('');
   const [activeConversationId, setActiveConversationId] = React.useState<string | null>(null);
+  const [sendMode, setSendMode] = React.useState<'text' | 'template'>('text');
   const [messageDraft, setMessageDraft] = React.useState('');
+  const [selectedTemplateKey, setSelectedTemplateKey] = React.useState<string | null>(null);
+  const [templateVariables, setTemplateVariables] = React.useState<string[]>(['', '', '', '', '']);
   const [sendingMessage, setSendingMessage] = React.useState(false);
   const [broadcastPhones, setBroadcastPhones] = React.useState('');
   const [broadcastMessage, setBroadcastMessage] = React.useState('');
@@ -106,18 +109,89 @@ const CrmWhatsappInboxPage: React.FC = () => {
     container.scrollTop = container.scrollHeight;
   }, [activeConversationId, messages]);
 
+  const availableTemplates = React.useMemo(() => {
+    const raw = Array.isArray(metaConfig?.templates) ? metaConfig?.templates : [];
+    return raw
+      .filter((template) => template?.name && template?.is_active !== false)
+      .map((template) => ({
+        name: String(template.name),
+        language: String(template.language || 'es_CO'),
+        label: String(template.label || template.name),
+      }));
+  }, [metaConfig?.templates]);
+
+  React.useEffect(() => {
+    if (availableTemplates.length === 0) {
+      setSelectedTemplateKey(null);
+      return;
+    }
+
+    const defaultName = String(metaConfig?.default_template_name || '');
+    const defaultLanguage = String(metaConfig?.default_template_language || 'es_CO');
+    const preferredKey = defaultName ? `${defaultName}::${defaultLanguage}` : null;
+    const hasPreferred = preferredKey
+      ? availableTemplates.some((template) => `${template.name}::${template.language}` === preferredKey)
+      : false;
+
+    if (hasPreferred && preferredKey) {
+      setSelectedTemplateKey(preferredKey);
+      return;
+    }
+
+    if (!selectedTemplateKey) {
+      setSelectedTemplateKey(`${availableTemplates[0].name}::${availableTemplates[0].language}`);
+    }
+  }, [availableTemplates, metaConfig?.default_template_language, metaConfig?.default_template_name, selectedTemplateKey]);
+
+  React.useEffect(() => {
+    setTemplateVariables((prev) => {
+      const next = [...prev];
+      next[0] = activeConversation?.contact_name || activeConversation?.client?.name || '';
+      return next;
+    });
+  }, [activeConversation?.client?.name, activeConversation?.contact_name]);
+
   const handleSendMessage = async () => {
-    if (!messageDraft.trim() || !resolvedCompanyId || !activeConversation) return;
+    if (!resolvedCompanyId || !activeConversation) return;
+    if (sendMode === 'text' && !messageDraft.trim()) return;
+    if (sendMode === 'template' && !selectedTemplateKey) return;
 
     setSendingMessage(true);
     try {
-      await whatsappService.sendMessage({
+      const payload: {
+        company_id?: number;
+        conversation_id?: string;
+        to?: string;
+        message?: string;
+        template_name?: string;
+        template_language?: string;
+        template_variables?: string[];
+      } = {
         company_id: resolvedCompanyId,
         conversation_id: activeConversation.id,
         to: activeConversation.contact_phone || undefined,
-        message: messageDraft.trim(),
+      };
+
+      if (sendMode === 'template') {
+        const [templateName = '', templateLanguage = 'es_CO'] = (selectedTemplateKey || '').split('::');
+        payload.template_name = templateName;
+        payload.template_language = templateLanguage || 'es_CO';
+        payload.template_variables = [...templateVariables];
+      } else {
+        payload.message = messageDraft.trim();
+      }
+
+      await whatsappService.sendMessage({
+        ...payload,
       });
       setMessageDraft('');
+      if (sendMode === 'template') {
+        setTemplateVariables((prev) => {
+          const next = ['', '', '', '', ''];
+          next[0] = activeConversation?.contact_name || activeConversation?.client?.name || '';
+          return next;
+        });
+      }
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', resolvedCompanyId, activeConversation.id] });
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-conversations', resolvedCompanyId] });
       toast.success('Mensaje enviado correctamente');
@@ -164,7 +238,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    if (!activeConversationId || !messageDraft.trim() || sendingMessage) return;
+    if (!activeConversationId || !messageDraft.trim() || sendingMessage || sendMode !== 'text') return;
     void handleSendMessage();
   };
 
@@ -330,23 +404,97 @@ const CrmWhatsappInboxPage: React.FC = () => {
             )}
           </div>
 
-          <div className="mt-3 flex items-center gap-2">
-            <input
-              className="input input-bordered w-full"
-              placeholder="Escribe tu respuesta..."
-              value={messageDraft}
-              onChange={(event) => setMessageDraft(event.target.value)}
-              onKeyDown={handleComposerKeyDown}
-              disabled={!activeConversationId || sendingMessage}
-            />
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleSendMessage}
-              disabled={!activeConversationId || !messageDraft.trim() || sendingMessage}
-            >
-              <BiSend className="w-4 h-4" />
-            </button>
+          <div className="mt-3 space-y-3">
+            <div className="tabs tabs-boxed w-fit">
+              <button
+                type="button"
+                className={`tab ${sendMode === 'text' ? 'tab-active' : ''}`}
+                onClick={() => setSendMode('text')}
+              >
+                Texto
+              </button>
+              <button
+                type="button"
+                className={`tab ${sendMode === 'template' ? 'tab-active' : ''}`}
+                onClick={() => setSendMode('template')}
+              >
+                Plantilla
+              </button>
+            </div>
+
+            {sendMode === 'template' ? (
+              <div className="space-y-3 rounded-2xl border border-base-200 p-3">
+                <label className="form-control w-full">
+                  <span className="label-text mb-2">Plantilla</span>
+                  <SearchableSelect
+                    options={availableTemplates.map((template) => ({
+                      value: `${template.name}::${template.language}`,
+                      label: `${template.label} (${template.language})`,
+                    }))}
+                    value={selectedTemplateKey}
+                    onChange={(value) => setSelectedTemplateKey(value ? String(value) : null)}
+                    placeholder="Selecciona una plantilla"
+                    isDisabled={!activeConversationId || sendingMessage || availableTemplates.length === 0}
+                    isClearable={false}
+                  />
+                </label>
+
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {templateVariables.map((value, index) => (
+                    <label key={`template-var-${index}`} className="form-control w-full">
+                      <span className="label-text mb-1 text-xs">Variable {`{{${index + 1}}}`}</span>
+                      <input
+                        className="input input-bordered w-full"
+                        placeholder={index === 0 ? 'Nombre del contacto' : `Valor para {{${index + 1}}}`}
+                        value={value}
+                        onChange={(event) => {
+                          const nextValues = [...templateVariables];
+                          nextValues[index] = event.target.value;
+                          setTemplateVariables(nextValues);
+                        }}
+                        disabled={!activeConversationId || sendingMessage}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-base-content/60">
+                  Por defecto, la variable {`{{1}}`} se llena con el nombre del contacto activo.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  className="input input-bordered w-full"
+                  placeholder="Escribe tu respuesta..."
+                  value={messageDraft}
+                  onChange={(event) => setMessageDraft(event.target.value)}
+                  onKeyDown={handleComposerKeyDown}
+                  disabled={!activeConversationId || sendingMessage}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSendMessage}
+                  disabled={!activeConversationId || !messageDraft.trim() || sendingMessage}
+                >
+                  <BiSend className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {sendMode === 'template' && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSendMessage}
+                  disabled={!activeConversationId || !selectedTemplateKey || sendingMessage}
+                >
+                  <BiSend className="w-4 h-4" />
+                  Enviar plantilla
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </section>

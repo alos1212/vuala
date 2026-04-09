@@ -20,7 +20,15 @@ export const whatsappService = {
     await api.post(`/crm/whatsapp/conversations/${conversationId}/mark-read`, companyId ? { company_id: companyId } : {});
   },
 
-  async sendMessage(payload: { company_id?: number; conversation_id?: string; to?: string; message: string }): Promise<void> {
+  async sendMessage(payload: {
+    company_id?: number;
+    conversation_id?: string;
+    to?: string;
+    message?: string;
+    template_name?: string;
+    template_language?: string;
+    template_variables?: string[];
+  }): Promise<void> {
     await api.post('/crm/whatsapp/messages', payload);
   },
 
