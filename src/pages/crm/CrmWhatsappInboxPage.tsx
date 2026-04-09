@@ -400,6 +400,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
       message?: string;
       template_name?: string;
       template_language?: string;
+      template_body_text?: string;
       template_variables?: string[];
       template_variable_sources?: string[];
       recipient_client_id?: number;
@@ -423,6 +424,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
       const [templateName = '', templateLanguage = 'es_CO'] = broadcastTemplateKey.split('::');
       payload.template_name = templateName;
       payload.template_language = templateLanguage || 'es_CO';
+      payload.template_body_text = broadcastTemplatePreview?.body_text || undefined;
       payload.template_variables = [...broadcastTemplateVariables];
       payload.template_variable_sources = [...broadcastVariableSources];
     } else {
