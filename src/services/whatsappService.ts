@@ -72,6 +72,7 @@ export const whatsappService = {
       label?: string | null;
       body_text?: string | null;
       status?: string;
+      rejection_reason?: string | null;
       is_active?: boolean;
     };
     meta?: any;

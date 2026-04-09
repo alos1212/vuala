@@ -362,6 +362,13 @@ const CompanyDetailPage: React.FC = () => {
       });
 
       const createdTemplate = created?.template;
+      const createdStatus = String(createdTemplate?.status || '').toUpperCase();
+      if (createdStatus === 'REJECTED') {
+        const reason = createdTemplate?.rejection_reason?.trim() || 'Meta rechazó la plantilla. Revisa el contenido e inténtalo de nuevo.';
+        toast.error(reason);
+        return;
+      }
+
       if (createdTemplate?.name) {
         setWhatsappConfigForm((prev) => {
           const templates = Array.isArray(prev.templates) ? prev.templates : [];
@@ -390,7 +397,11 @@ const CompanyDetailPage: React.FC = () => {
       }
 
       await queryClient.invalidateQueries({ queryKey: ['company-whatsapp-config', companyId] });
-      toast.success('Plantilla creada en Meta correctamente');
+      if (createdStatus === 'PENDING') {
+        toast.success('Plantilla enviada a Meta. Estado: PENDING');
+      } else {
+        toast.success('Plantilla creada en Meta correctamente');
+      }
       setNewWhatsappTemplate((prev) => ({
         ...prev,
         name: '',
@@ -399,7 +410,9 @@ const CompanyDetailPage: React.FC = () => {
         label: '',
       }));
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'No se pudo crear la plantilla en Meta');
+      const apiMessage = error?.response?.data?.message;
+      const metaReason = error?.response?.data?.errors?.meta?.[0];
+      toast.error(metaReason || apiMessage || 'No se pudo crear la plantilla en Meta');
     } finally {
       setIsCreatingWhatsappTemplate(false);
     }
