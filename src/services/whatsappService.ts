@@ -34,6 +34,7 @@ export const whatsappService = {
     message?: string;
     template_name?: string;
     template_language?: string;
+    template_body_text?: string;
     template_variables?: string[];
   }): Promise<void> {
     await api.post('/crm/whatsapp/messages', payload);
