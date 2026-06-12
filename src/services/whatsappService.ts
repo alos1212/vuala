@@ -36,7 +36,33 @@ export const whatsappService = {
     template_language?: string;
     template_body_text?: string;
     template_variables?: string[];
+    attachment?: File | null;
   }): Promise<void> {
+    if (payload.attachment instanceof File) {
+      const formData = new FormData();
+
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+
+        if (value instanceof File) {
+          formData.append(key, value);
+          return;
+        }
+
+        if (Array.isArray(value)) {
+          value.forEach((entry) => formData.append(`${key}[]`, String(entry)));
+          return;
+        }
+
+        formData.append(key, String(value));
+      });
+
+      await api.post('/crm/whatsapp/messages', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return;
+    }
+
     await api.post('/crm/whatsapp/messages', payload);
   },
 

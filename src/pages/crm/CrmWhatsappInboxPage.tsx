@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BiCheckCircle, BiSend, BiTask, BiTime } from 'react-icons/bi';
+import { BiCheckCircle, BiFile, BiPaperclip, BiSend, BiSmile, BiTask, BiTime, BiX } from 'react-icons/bi';
 import { FaWhatsapp } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,8 @@ import { companyService } from '../../services/companyService';
 import { geoService } from '../../services/geoService';
 import { whatsappService } from '../../services/whatsappService';
 import { useAuthStore } from '../../stores/authStore';
+
+const QUICK_EMOJIS = ['😀', '😂', '😍', '🙏', '👍', '🎉', '✅', '📌', '👋', '💬', '🔥', '❤️'];
 
 const CrmWhatsappInboxPage: React.FC = () => {
   const REALTIME_REFRESH_MS = 1000;
@@ -25,7 +27,9 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const [searchConversation, setSearchConversation] = React.useState('');
   const [activeConversationId, setActiveConversationId] = React.useState<string | null>(null);
   const [isTemplateComposerOpen, setIsTemplateComposerOpen] = React.useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
   const [messageDraft, setMessageDraft] = React.useState('');
+  const [selectedAttachment, setSelectedAttachment] = React.useState<File | null>(null);
   const [selectedTemplateKey, setSelectedTemplateKey] = React.useState<string | null>(null);
   const [templateVariables, setTemplateVariables] = React.useState<string[]>(['', '', '', '', '']);
   const [sendingMessage, setSendingMessage] = React.useState(false);
@@ -55,8 +59,13 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const [sendingBroadcast, setSendingBroadcast] = React.useState(false);
   const [markingReadConversationId, setMarkingReadConversationId] = React.useState<string | null>(null);
   const messagesContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const attachmentInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const resolvedCompanyId = selectedCompanyId ?? userCompanyId ?? null;
+  const attachmentPreviewUrl = React.useMemo(() => {
+    if (!selectedAttachment || !selectedAttachment.type.startsWith('image/')) return null;
+    return URL.createObjectURL(selectedAttachment);
+  }, [selectedAttachment]);
 
   const { data: companiesData } = useQuery({
     queryKey: ['companies-for-whatsapp'],
@@ -206,6 +215,22 @@ const CrmWhatsappInboxPage: React.FC = () => {
     container.scrollTop = container.scrollHeight;
   }, [activeConversationId, messages]);
 
+  React.useEffect(() => {
+    return () => {
+      if (attachmentPreviewUrl) {
+        URL.revokeObjectURL(attachmentPreviewUrl);
+      }
+    };
+  }, [attachmentPreviewUrl]);
+
+  React.useEffect(() => {
+    setIsEmojiPickerOpen(false);
+    setSelectedAttachment(null);
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = '';
+    }
+  }, [activeConversationId, isTemplateComposerOpen]);
+
   const availableTemplates = React.useMemo(() => {
     const raw = Array.isArray(metaConfig?.templates) ? metaConfig?.templates : [];
     return raw
@@ -329,6 +354,23 @@ const CrmWhatsappInboxPage: React.FC = () => {
     return '';
   };
 
+  const clearSelectedAttachment = React.useCallback(() => {
+    setSelectedAttachment(null);
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = '';
+    }
+  }, []);
+
+  const handleAttachmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setSelectedAttachment(file);
+  };
+
+  const appendEmojiToDraft = (emoji: string) => {
+    setMessageDraft((prev) => `${prev}${emoji}`);
+    setIsEmojiPickerOpen(false);
+  };
+
   const templateSourceOptions = [
     { value: 'manual', label: 'Manual' },
     { value: 'contact_name', label: 'Nombre contacto' },
@@ -340,7 +382,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
 
   const handleSendMessage = async (mode: 'text' | 'template') => {
     if (!resolvedCompanyId || !activeConversation) return;
-    if (mode === 'text' && !messageDraft.trim()) return;
+    if (mode === 'text' && !messageDraft.trim() && !selectedAttachment) return;
     if (mode === 'template' && !selectedTemplateKey) return;
 
     setSendingMessage(true);
@@ -354,6 +396,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
         template_language?: string;
         template_body_text?: string;
         template_variables?: string[];
+        attachment?: File | null;
       } = {
         company_id: resolvedCompanyId,
         conversation_id: activeConversation.id,
@@ -367,13 +410,16 @@ const CrmWhatsappInboxPage: React.FC = () => {
         payload.template_body_text = chatTemplatePreview?.body_text || undefined;
         payload.template_variables = [...templateVariables];
       } else {
-        payload.message = messageDraft.trim();
+        payload.message = messageDraft.trim() || undefined;
+        payload.attachment = selectedAttachment;
       }
 
       await whatsappService.sendMessage({
         ...payload,
       });
       setMessageDraft('');
+      clearSelectedAttachment();
+      setIsEmojiPickerOpen(false);
       if (mode === 'template') {
         setTemplateVariables((prev) =>
           prev.map((_, index) => (index === 0 ? (activeConversation?.contact_name || activeConversation?.client?.name || '') : ''))
@@ -518,6 +564,20 @@ const CrmWhatsappInboxPage: React.FC = () => {
       const resolvedValue = values[variableIndex]?.trim();
       return resolvedValue || `{{${indexText}}}`;
     });
+  };
+  const getMessageAttachment = (message: typeof messages[number]) => message?.meta?.attachment ?? null;
+  const shouldRenderMessageBody = (message: typeof messages[number]) => {
+    const body = String(message.body || '').trim();
+    if (!body) return false;
+
+    const attachment = getMessageAttachment(message);
+    const fileName = String(attachment?.file_name || '').trim();
+
+    if (fileName !== '' && body === fileName) {
+      return false;
+    }
+
+    return true;
   };
   const totalUnread = conversations.reduce((sum, item) => sum + Number(item.unread_count || 0), 0);
   const isGeoFilterMode = broadcastTargetType === 'geo';
@@ -729,7 +789,50 @@ const CrmWhatsappInboxPage: React.FC = () => {
                                 : 'bg-base-200 text-base-content'
                             }`}
                           >
-                            <div className="whitespace-pre-wrap break-words">{message.body}</div>
+                            {getMessageAttachment(message)?.kind === 'image' && getMessageAttachment(message)?.url ? (
+                              <a
+                                href={String(getMessageAttachment(message)?.url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block overflow-hidden rounded-xl border border-white/10 bg-black/10"
+                              >
+                                <img
+                                  src={String(getMessageAttachment(message)?.url)}
+                                  alt={String(getMessageAttachment(message)?.file_name || 'Imagen adjunta')}
+                                  className="max-h-72 w-full object-cover"
+                                />
+                              </a>
+                            ) : null}
+
+                            {getMessageAttachment(message)?.kind === 'document' && getMessageAttachment(message)?.url ? (
+                              <a
+                                href={String(getMessageAttachment(message)?.url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
+                                  message.direction === 'outbound'
+                                    ? 'border-white/15 bg-white/10'
+                                    : 'border-base-300 bg-base-100'
+                                }`}
+                              >
+                                <BiFile className="h-5 w-5 shrink-0" />
+                                <div className="min-w-0">
+                                  <div className="truncate font-medium">
+                                    {getMessageAttachment(message)?.file_name || 'Archivo adjunto'}
+                                  </div>
+                                  <div className={`text-[11px] ${message.direction === 'outbound' ? 'text-primary-content/80' : 'text-base-content/60'}`}>
+                                    Descargar archivo
+                                  </div>
+                                </div>
+                              </a>
+                            ) : null}
+
+                            {shouldRenderMessageBody(message) && (
+                              <div className={`${getMessageAttachment(message) ? 'mt-2' : ''} whitespace-pre-wrap break-words`}>
+                                {message.body}
+                              </div>
+                            )}
+
                             <div className={`mt-1 text-[11px] ${message.direction === 'outbound' ? 'text-primary-content/80' : 'text-base-content/60'}`}>
                               {message.sent_at ? new Date(message.sent_at).toLocaleString() : ''}
                             </div>
@@ -753,23 +856,91 @@ const CrmWhatsappInboxPage: React.FC = () => {
                         </button>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="relative space-y-2">
                         <input
-                          className="input input-bordered w-full"
-                          placeholder="Escribe tu respuesta..."
-                          value={messageDraft}
-                          onChange={(event) => setMessageDraft(event.target.value)}
-                          onKeyDown={handleComposerKeyDown}
-                          disabled={!activeConversationId || sendingMessage}
+                          ref={attachmentInputRef}
+                          type="file"
+                          className="hidden"
+                          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                          onChange={handleAttachmentChange}
                         />
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          onClick={() => void handleSendMessage('text')}
-                          disabled={!activeConversationId || !messageDraft.trim() || sendingMessage}
-                        >
-                          <BiSend className="w-4 h-4" />
-                        </button>
+
+                        {selectedAttachment && (
+                          <div className="flex items-start gap-3 rounded-2xl border border-base-200 bg-base-50 p-3">
+                            {attachmentPreviewUrl ? (
+                              <img
+                                src={attachmentPreviewUrl}
+                                alt={selectedAttachment.name}
+                                className="h-14 w-14 rounded-xl object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-base-300 bg-base-100">
+                                <BiFile className="h-6 w-6 text-base-content/60" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-medium">{selectedAttachment.name}</div>
+                              <div className="text-xs text-base-content/60">
+                                {(selectedAttachment.size / 1024 / 1024).toFixed(2)} MB
+                              </div>
+                            </div>
+                            <button type="button" className="btn btn-ghost btn-sm btn-square" onClick={clearSelectedAttachment}>
+                              <BiX className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+
+                        {isEmojiPickerOpen && (
+                          <div className="absolute bottom-full left-0 z-20 mb-2 grid w-[260px] grid-cols-6 gap-2 rounded-2xl border border-base-200 bg-base-100 p-3 shadow-xl">
+                            {QUICK_EMOJIS.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                className="btn btn-ghost btn-sm text-xl"
+                                onClick={() => appendEmojiToDraft(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-square"
+                            onClick={() => attachmentInputRef.current?.click()}
+                            disabled={!activeConversationId || sendingMessage}
+                            title="Adjuntar archivo"
+                          >
+                            <BiPaperclip className="h-5 w-5" />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-square"
+                            onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
+                            disabled={!activeConversationId || sendingMessage}
+                            title="Agregar emoji"
+                          >
+                            <BiSmile className="h-5 w-5" />
+                          </button>
+                          <input
+                            className="input input-bordered w-full"
+                            placeholder="Escribe un mensaje o agrega un archivo..."
+                            value={messageDraft}
+                            onChange={(event) => setMessageDraft(event.target.value)}
+                            onKeyDown={handleComposerKeyDown}
+                            disabled={!activeConversationId || sendingMessage}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => void handleSendMessage('text')}
+                            disabled={!activeConversationId || (!messageDraft.trim() && !selectedAttachment) || sendingMessage}
+                          >
+                            <BiSend className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

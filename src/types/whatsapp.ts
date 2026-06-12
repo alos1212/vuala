@@ -25,6 +25,18 @@ export interface WhatsappMessage {
   body: string;
   sent_at: string;
   status?: 'sent' | 'delivered' | 'read' | 'failed' | string;
+  meta?: {
+    attachment?: {
+      kind?: 'image' | 'document' | string;
+      url?: string | null;
+      file_name?: string | null;
+      mime_type?: string | null;
+      size?: number | null;
+      caption?: string | null;
+      media_id?: string | null;
+    } | null;
+    [key: string]: unknown;
+  } | null;
 }
 
 export interface WhatsappMetaConfig {
