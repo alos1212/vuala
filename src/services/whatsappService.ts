@@ -35,10 +35,12 @@ export const whatsappService = {
     template_name?: string;
     template_language?: string;
     template_body_text?: string;
+    template_header_format?: string;
+    template_header_media?: File | null;
     template_variables?: string[];
     attachment?: File | null;
   }): Promise<void> {
-    if (payload.attachment instanceof File) {
+    if (payload.attachment instanceof File || payload.template_header_media instanceof File) {
       const formData = new FormData();
 
       Object.entries(payload).forEach(([key, value]) => {
@@ -67,6 +69,31 @@ export const whatsappService = {
   },
 
   async sendBroadcast(payload: WhatsappBroadcastPayload): Promise<void> {
+    if (payload.template_header_media instanceof File) {
+      const formData = new FormData();
+
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+
+        if (value instanceof File) {
+          formData.append(key, value);
+          return;
+        }
+
+        if (Array.isArray(value)) {
+          value.forEach((entry) => formData.append(`${key}[]`, String(entry)));
+          return;
+        }
+
+        formData.append(key, String(value));
+      });
+
+      await api.post('/crm/whatsapp/broadcast', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return;
+    }
+
     await api.post('/crm/whatsapp/broadcast', payload);
   },
 
@@ -98,12 +125,38 @@ export const whatsappService = {
       category: string;
       label?: string | null;
       body_text?: string | null;
+      header_format?: string | null;
       status?: string;
       rejection_reason?: string | null;
       is_active?: boolean;
     };
     meta?: any;
   }> {
+    if (payload.header_media_sample instanceof File) {
+      const formData = new FormData();
+
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+
+        if (value instanceof File) {
+          formData.append(key, value);
+          return;
+        }
+
+        if (Array.isArray(value)) {
+          value.forEach((entry) => formData.append(`${key}[]`, String(entry)));
+          return;
+        }
+
+        formData.append(key, String(value));
+      });
+
+      const response = await api.post('/crm/whatsapp/templates', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return unwrap(response.data);
+    }
+
     const response = await api.post('/crm/whatsapp/templates', payload);
     return unwrap(response.data);
   },

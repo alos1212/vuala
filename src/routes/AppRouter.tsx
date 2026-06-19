@@ -37,6 +37,8 @@ import CrmDashboardPage from "../pages/crm/CrmDashboardPage"
 import CrmTasksPage from "../pages/crm/CrmTasksPage"
 import CrmActivityFormPage from "../pages/crm/CrmActivityFormPage"
 import CrmWhatsappInboxPage from "../pages/crm/CrmWhatsappInboxPage"
+import CrmContactsPage from "../pages/crm/CrmContactsPage"
+import CrmContactDetailPage from "../pages/crm/CrmContactDetailPage"
 
 const AppRouter: React.FC = () => {
     const { isAuthenticated } = useAuthStore()
@@ -189,6 +191,22 @@ const AppRouter: React.FC = () => {
                                 }
                             />
                             <Route
+                                path="contacts"
+                                element={
+                                    <ProtectedRoute permission="crm.contacts.list">
+                                        <CrmContactsPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="contacts/:id"
+                                element={
+                                    <ProtectedRoute permission="crm.contacts.read">
+                                        <CrmContactDetailPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
                                 path="crm"
                                 element={
                                     <ProtectedRoute permission="crm.activities.list">
@@ -225,6 +243,14 @@ const AppRouter: React.FC = () => {
                                 element={
                                     <ProtectedRoute permissionAny={["crm.whatsapp.inbox", "crm.activities.list"]}>
                                         <CrmWhatsappInboxPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="crm/contactos"
+                                element={
+                                    <ProtectedRoute permission="crm.contacts.list">
+                                        <Navigate to="/contacts" replace />
                                     </ProtectedRoute>
                                 }
                             />

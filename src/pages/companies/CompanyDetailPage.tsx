@@ -75,11 +75,14 @@ const CompanyDetailPage: React.FC = () => {
     name: '',
     language: 'es_CO',
     category: 'MARKETING' as 'MARKETING' | 'UTILITY' | 'AUTHENTICATION',
+    header_format: 'NONE' as 'NONE' | 'IMAGE' | 'VIDEO' | 'DOCUMENT',
     body_text: '',
     example_values_text: '',
     label: '',
     is_active: true,
   });
+  const [newWhatsappTemplateHeaderSample, setNewWhatsappTemplateHeaderSample] = React.useState<File | null>(null);
+  const newWhatsappTemplateHeaderSampleInputRef = React.useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = React.useState<'general' | 'users' | 'categories' | 'whatsapp'>('general');
   const { id } = useParams<{ id: string }>();
   const companyId = Number(id);
@@ -133,6 +136,14 @@ const CompanyDetailPage: React.FC = () => {
     queryKey: ['geo-countries'],
     queryFn: geoService.getCountries,
   });
+
+  React.useEffect(() => {
+    if (newWhatsappTemplate.header_format !== 'NONE') return;
+    setNewWhatsappTemplateHeaderSample(null);
+    if (newWhatsappTemplateHeaderSampleInputRef.current) {
+      newWhatsappTemplateHeaderSampleInputRef.current.value = '';
+    }
+  }, [newWhatsappTemplate.header_format]);
 
   const { data: states = [] } = useQuery({
     queryKey: ['geo-states', companyCountryId],
@@ -298,6 +309,67 @@ const CompanyDetailPage: React.FC = () => {
     }
   };
 
+  const closeTemplateModal = () => {
+    if (isCreatingWhatsappTemplate) return;
+    setIsTemplateModalOpen(false);
+    setNewWhatsappTemplateHeaderSample(null);
+    if (newWhatsappTemplateHeaderSampleInputRef.current) {
+      newWhatsappTemplateHeaderSampleInputRef.current.value = '';
+    }
+  };
+
+  const getTemplateHeaderSampleAccept = (headerFormat: 'NONE' | 'IMAGE' | 'VIDEO' | 'DOCUMENT') => {
+    if (headerFormat === 'IMAGE') return 'image/jpeg,image/jpg,image/png';
+    if (headerFormat === 'VIDEO') return 'video/mp4';
+    if (headerFormat === 'DOCUMENT') return 'application/pdf,.pdf';
+    return '';
+  };
+
+  const buildWhatsappTemplateErrorMessage = (error: any) => {
+    const responseData = error?.response?.data;
+    const fieldErrors = responseData?.errors;
+    const flattenedFieldErrors = fieldErrors && typeof fieldErrors === 'object'
+      ? Object.values(fieldErrors)
+          .flatMap((value) => Array.isArray(value) ? value : [])
+          .map((value) => String(value || '').trim())
+          .filter(Boolean)
+      : [];
+
+    const metaErrorMessage = String(
+      responseData?.meta?.error?.error_user_msg ||
+      responseData?.meta?.error?.message ||
+      responseData?.meta?.error?.error_data?.details ||
+      responseData?.meta?.error?.error_subcode ||
+      '',
+    ).trim();
+
+    const candidates = [
+      metaErrorMessage,
+      ...flattenedFieldErrors,
+      String(responseData?.message || '').trim(),
+      String(error?.message || '').trim(),
+    ].filter(Boolean);
+
+    return candidates[0] || 'No se pudo crear la plantilla en Meta';
+  };
+
+  const getWhatsappTemplateStatus = (template?: { status?: string | null }) => String(template?.status || '').trim().toUpperCase();
+
+  const getWhatsappTemplateStatusLabel = (status: string) => {
+    if (status === 'APPROVED') return 'Aprobada';
+    if (status === 'PENDING') return 'Pendiente';
+    if (status === 'REJECTED') return 'Rechazada';
+    if (status === 'MISSING') return 'No encontrada';
+    return status || 'Sin verificar';
+  };
+
+  const getWhatsappTemplateStatusBadgeClass = (status: string) => {
+    if (status === 'APPROVED') return 'badge-success';
+    if (status === 'PENDING') return 'badge-warning';
+    if (status === 'REJECTED' || status === 'MISSING') return 'badge-error';
+    return 'badge-ghost';
+  };
+
   const handleCreateWhatsappTemplateInMeta = async () => {
     if (!Number.isFinite(companyId) || !canUpdateWhatsappConfig || isCreatingWhatsappTemplate) return;
 
@@ -305,6 +377,11 @@ const CompanyDetailPage: React.FC = () => {
     const bodyText = newWhatsappTemplate.body_text.trim();
     if (!name || !bodyText) {
       toast.error('Nombre y contenido del body son obligatorios');
+      return;
+    }
+
+    if (newWhatsappTemplate.header_format !== 'NONE' && !newWhatsappTemplateHeaderSample) {
+      toast.error('Debes subir un archivo de muestra para el encabezado multimedia');
       return;
     }
 
@@ -323,6 +400,8 @@ const CompanyDetailPage: React.FC = () => {
         category: newWhatsappTemplate.category,
         body_text: bodyText,
         label: newWhatsappTemplate.label.trim() || undefined,
+        header_format: newWhatsappTemplate.header_format,
+        header_media_sample: newWhatsappTemplateHeaderSample,
         example_values: exampleValues.length > 0 ? exampleValues : undefined,
       });
 
@@ -348,15 +427,18 @@ const CompanyDetailPage: React.FC = () => {
                 name: createdTemplate.name,
                 language: createdTemplate.language || 'es_CO',
                 label: createdTemplate.label || null,
-                is_active: true,
+                header_format: createdTemplate.header_format || null,
+                status: createdTemplate.status || null,
+                rejection_reason: createdTemplate.rejection_reason || null,
+                is_active: createdTemplate.is_active ?? false,
               },
             ];
 
           return {
             ...prev,
             templates: nextTemplates,
-            default_template_name: prev.default_template_name || createdTemplate.name,
-            default_template_language: prev.default_template_language || createdTemplate.language || 'es_CO',
+            default_template_name: prev.default_template_name || (createdStatus === 'APPROVED' ? createdTemplate.name : ''),
+            default_template_language: prev.default_template_language || (createdStatus === 'APPROVED' ? (createdTemplate.language || 'es_CO') : 'es_CO'),
           };
         });
       }
@@ -373,12 +455,15 @@ const CompanyDetailPage: React.FC = () => {
         body_text: '',
         example_values_text: '',
         label: '',
+        header_format: 'NONE',
       }));
+      setNewWhatsappTemplateHeaderSample(null);
+      if (newWhatsappTemplateHeaderSampleInputRef.current) {
+        newWhatsappTemplateHeaderSampleInputRef.current.value = '';
+      }
       setIsTemplateModalOpen(false);
     } catch (error: any) {
-      const apiMessage = error?.response?.data?.message;
-      const metaReason = error?.response?.data?.errors?.meta?.[0];
-      toast.error(metaReason || apiMessage || 'No se pudo crear la plantilla en Meta');
+      toast.error(buildWhatsappTemplateErrorMessage(error));
     } finally {
       setIsCreatingWhatsappTemplate(false);
     }
@@ -417,7 +502,12 @@ const CompanyDetailPage: React.FC = () => {
       return {
         ...prev,
         templates: templates.map((template, currentIndex) =>
-          currentIndex === index ? { ...template, is_active: isActive } : template
+          currentIndex === index
+            ? {
+              ...template,
+              is_active: getWhatsappTemplateStatus(template) === 'APPROVED' ? isActive : false,
+            }
+            : template
         ),
       };
     });
@@ -914,6 +1004,8 @@ const CompanyDetailPage: React.FC = () => {
                   const isDefault =
                     template.name === (whatsappConfigForm.default_template_name || '') &&
                     (template.language || 'es_CO') === (whatsappConfigForm.default_template_language || 'es_CO');
+                  const templateStatus = getWhatsappTemplateStatus(template);
+                  const isApprovedTemplate = templateStatus === 'APPROVED';
 
                   return (
                     <div key={`${template.name}-${template.language || 'es_CO'}-${index}`} className="rounded-xl border border-base-200 p-3">
@@ -923,8 +1015,21 @@ const CompanyDetailPage: React.FC = () => {
                           <div className="text-xs text-base-content/60">
                             {template.name} · {(template.language || 'es_CO')}
                           </div>
+                          {template.header_format && template.header_format !== 'NONE' && (
+                            <div className="mt-1 text-xs text-base-content/60">
+                              Header: {template.header_format}
+                            </div>
+                          )}
+                          {template.rejection_reason && (
+                            <div className="mt-1 text-xs text-error">
+                              {template.rejection_reason}
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
+                          <span className={`badge ${getWhatsappTemplateStatusBadgeClass(templateStatus)}`}>
+                            {getWhatsappTemplateStatusLabel(templateStatus)}
+                          </span>
                           <span className={`badge ${isDefault ? 'badge-primary' : 'badge-ghost'}`}>
                             {isDefault ? 'Predeterminada' : 'Disponible'}
                           </span>
@@ -932,9 +1037,9 @@ const CompanyDetailPage: React.FC = () => {
                             <input
                               type="checkbox"
                               className="checkbox checkbox-xs"
-                              checked={template.is_active !== false}
+                              checked={isApprovedTemplate && template.is_active !== false}
                               onChange={(event) => handleToggleTemplateActive(index, event.target.checked)}
-                              disabled={!canUpdateWhatsappConfig}
+                              disabled={!canUpdateWhatsappConfig || !isApprovedTemplate}
                             />
                             Activa
                           </label>
@@ -943,6 +1048,7 @@ const CompanyDetailPage: React.FC = () => {
                               type="button"
                               className="btn btn-ghost btn-xs"
                               onClick={() => handleSetDefaultWhatsappTemplate(template.name, template.language)}
+                              disabled={!isApprovedTemplate}
                             >
                               Marcar predeterminada
                             </button>
@@ -1059,6 +1165,26 @@ const CompanyDetailPage: React.FC = () => {
                   disabled={isCreatingWhatsappTemplate}
                 />
               </label>
+              <label className="form-control w-full">
+                <span className="label-text mb-2">Header multimedia</span>
+                <SearchableSelect
+                  options={[
+                    { value: 'NONE', label: 'Sin header' },
+                    { value: 'IMAGE', label: 'Imagen' },
+                    { value: 'VIDEO', label: 'Video MP4' },
+                    { value: 'DOCUMENT', label: 'Documento PDF' },
+                  ]}
+                  value={newWhatsappTemplate.header_format}
+                  onChange={(value) =>
+                    setNewWhatsappTemplate((prev) => ({
+                      ...prev,
+                      header_format: String(value || 'NONE') as 'NONE' | 'IMAGE' | 'VIDEO' | 'DOCUMENT',
+                    }))
+                  }
+                  isClearable={false}
+                  isDisabled={isCreatingWhatsappTemplate}
+                />
+              </label>
               <label className="form-control w-full md:col-span-4">
                 <span className="label-text mb-2">Body de plantilla (Meta)</span>
                 <textarea
@@ -1086,13 +1212,34 @@ const CompanyDetailPage: React.FC = () => {
                   Si el body tiene variables, agrega ejemplos en orden para que Meta valide.
                 </span>
               </label>
+              {newWhatsappTemplate.header_format !== 'NONE' && (
+                <label className="form-control w-full md:col-span-4">
+                  <span className="label-text mb-2">Archivo de muestra para header</span>
+                  <input
+                    ref={newWhatsappTemplateHeaderSampleInputRef}
+                    type="file"
+                    className="file-input file-input-bordered w-full"
+                    accept={getTemplateHeaderSampleAccept(newWhatsappTemplate.header_format)}
+                    onChange={(event) => setNewWhatsappTemplateHeaderSample(event.target.files?.[0] ?? null)}
+                    disabled={isCreatingWhatsappTemplate}
+                  />
+                  <span className="mt-1 text-xs text-base-content/60">
+                    Meta exige un archivo de ejemplo para validar plantillas con imagen, video o documento en el encabezado.
+                  </span>
+                  {newWhatsappTemplateHeaderSample && (
+                    <span className="mt-1 text-xs text-base-content/70">
+                      Archivo seleccionado: {newWhatsappTemplateHeaderSample.name}
+                    </span>
+                  )}
+                </label>
+              )}
             </div>
 
             <div className="modal-action">
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => setIsTemplateModalOpen(false)}
+                onClick={closeTemplateModal}
                 disabled={isCreatingWhatsappTemplate}
               >
                 Cancelar
@@ -1108,7 +1255,7 @@ const CompanyDetailPage: React.FC = () => {
               </button>
             </div>
           </div>
-          <div className="modal-backdrop" onClick={() => !isCreatingWhatsappTemplate && setIsTemplateModalOpen(false)} />
+          <div className="modal-backdrop" onClick={closeTemplateModal} />
         </div>
       )}
 

@@ -10,9 +10,10 @@ import GlobalTrmBadge from './GlobalTrmBadge';
 const Sidebar: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [openMenuByLevel, setOpenMenuByLevel] = useState<Record<number, string>>({});
-    const { user, logout } = useAuth();
+    const { user, logout, hasPermission } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
+    const canSeeCrmMenu = hasPermission('crm.activities.list') || hasPermission('crm.whatsapp.inbox');
 
     const toggleMenu = (key: string, level: number) => {
         setOpenMenuByLevel((prev) => {
@@ -51,10 +52,16 @@ const Sidebar: React.FC = () => {
             permission: 'clients.list'
         },
         {
+            name: 'Contactos',
+            icon: BiUser,
+            path: '/contacts',
+            permission: 'crm.contacts.list'
+        },
+        {
             name: 'CRM',
             icon: BiTask,
             path: '#',
-            permission: 'crm.activities.list',
+            visible: canSeeCrmMenu,
             submenu: [
                 { name: 'Resumen CRM', path: '/crm', permission: 'crm.activities.list', exact: true },
                 { name: 'Gestiones', path: '/crm/gestiones', permission: 'crm.activities.list', exact: true },

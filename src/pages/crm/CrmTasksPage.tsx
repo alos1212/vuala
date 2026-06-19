@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BiPencil, BiPlus, BiSearch, BiTrash } from 'react-icons/bi';
 import { crmService } from '../../services/crmService';
+import type { CrmActivity } from '../../types/crm';
+
+const getActivityTargetLabel = (activity: CrmActivity) => {
+  return activity.client?.name || activity.crmContact?.name || activity.contact_name || (activity.client_id ? `Cliente #${activity.client_id}` : 'Contacto');
+};
 
 const CrmTasksPage: React.FC = () => {
   const navigate = useNavigate();
@@ -27,7 +32,7 @@ const CrmTasksPage: React.FC = () => {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-base-content">Gestiones CRM</h1>
-          <p className="text-base-content/60">Listado de actividades y seguimientos por cliente.</p>
+          <p className="text-base-content/60">Listado de actividades y seguimientos por cliente o contacto CRM.</p>
         </div>
         <button className="btn btn-primary" onClick={() => navigate('/crm/gestiones/nueva')}>
           <BiPlus className="w-5 h-5" />
@@ -72,7 +77,7 @@ const CrmTasksPage: React.FC = () => {
               {activities.map((activity) => (
                 <tr key={activity.id}>
                   <td className="font-semibold">{activity.subject}</td>
-                  <td>{activity.client?.name || `Cliente #${activity.client_id}`}</td>
+                  <td>{getActivityTargetLabel(activity)}</td>
                   <td>{activity.assignedUser?.name || '-'}</td>
                   <td>{new Date(activity.scheduled_start_at).toLocaleString()}</td>
                   <td>{activity.status}</td>

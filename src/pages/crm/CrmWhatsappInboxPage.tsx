@@ -1,42 +1,60 @@
 import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BiCheckCircle, BiFile, BiPaperclip, BiSend, BiSmile, BiTask, BiTime, BiX } from 'react-icons/bi';
+import EmojiPicker, { type EmojiClickData, EmojiStyle, Theme } from 'emoji-picker-react';
 import { FaWhatsapp } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import SearchableSelect from '../../components/ui/SearchableSelect';
 import { clientService } from '../../services/clientService';
 import { companyService } from '../../services/companyService';
 import { geoService } from '../../services/geoService';
 import { whatsappService } from '../../services/whatsappService';
 import { useAuthStore } from '../../stores/authStore';
+import type { WhatsappConversation } from '../../types/whatsapp';
 
-const QUICK_EMOJIS = ['😀', '😂', '😍', '🙏', '👍', '🎉', '✅', '📌', '👋', '💬', '🔥', '❤️'];
+interface DirectChatTarget {
+  phone: string;
+  contactName: string;
+  companyId: number;
+  clientId?: number | null;
+}
+
+const normalizePhoneValue = (value?: string | null) => String(value || '').replace(/[^\d+]/g, '');
 
 const CrmWhatsappInboxPage: React.FC = () => {
   const REALTIME_REFRESH_MS = 1000;
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const hasPermission = useAuthStore((state) => state.hasPermission);
   const userCompanyId = Number(user?.company_id) || undefined;
+  const requestedCompanyId = Number(searchParams.get('company_id') || '') || null;
+  const requestedPhone = normalizePhoneValue(searchParams.get('phone'));
+  const requestedContactName = String(searchParams.get('contact_name') || '').trim();
+  const requestedClientId = Number(searchParams.get('client_id') || '') || null;
   const canListCompanies = hasPermission('companies.list');
   const canReadCompanies = hasPermission('companies.read');
   const [activeTab, setActiveTab] = React.useState<'chat' | 'send'>('chat');
-  const [selectedCompanyId, setSelectedCompanyId] = React.useState<number | null>(userCompanyId ?? null);
+  const [selectedCompanyId, setSelectedCompanyId] = React.useState<number | null>(requestedCompanyId ?? userCompanyId ?? null);
   const [searchConversation, setSearchConversation] = React.useState('');
   const [activeConversationId, setActiveConversationId] = React.useState<string | null>(null);
+  const [directChatTarget, setDirectChatTarget] = React.useState<DirectChatTarget | null>(null);
+  const [pendingConversationPhone, setPendingConversationPhone] = React.useState<string | null>(null);
   const [isTemplateComposerOpen, setIsTemplateComposerOpen] = React.useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
   const [messageDraft, setMessageDraft] = React.useState('');
   const [selectedAttachment, setSelectedAttachment] = React.useState<File | null>(null);
   const [selectedTemplateKey, setSelectedTemplateKey] = React.useState<string | null>(null);
+  const [selectedTemplateHeaderMedia, setSelectedTemplateHeaderMedia] = React.useState<File | null>(null);
   const [templateVariables, setTemplateVariables] = React.useState<string[]>(['', '', '', '', '']);
   const [sendingMessage, setSendingMessage] = React.useState(false);
   const [broadcastPhones, setBroadcastPhones] = React.useState('');
   const [broadcastTargetType, setBroadcastTargetType] = React.useState<'specific' | 'client' | 'geo'>('specific');
   const [broadcastSendMode, setBroadcastSendMode] = React.useState<'text' | 'template'>('text');
   const [broadcastTemplateKey, setBroadcastTemplateKey] = React.useState<string | null>(null);
+  const [broadcastTemplateHeaderMedia, setBroadcastTemplateHeaderMedia] = React.useState<File | null>(null);
   const [broadcastTemplateVariables, setBroadcastTemplateVariables] = React.useState<string[]>([
     user?.name || '',
     '',
@@ -60,12 +78,19 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const [markingReadConversationId, setMarkingReadConversationId] = React.useState<string | null>(null);
   const messagesContainerRef = React.useRef<HTMLDivElement | null>(null);
   const attachmentInputRef = React.useRef<HTMLInputElement | null>(null);
+  const templateHeaderMediaInputRef = React.useRef<HTMLInputElement | null>(null);
+  const broadcastTemplateHeaderMediaInputRef = React.useRef<HTMLInputElement | null>(null);
+  const messageInputRef = React.useRef<HTMLInputElement | null>(null);
+  const emojiPickerContainerRef = React.useRef<HTMLDivElement | null>(null);
 
   const resolvedCompanyId = selectedCompanyId ?? userCompanyId ?? null;
-  const attachmentPreviewUrl = React.useMemo(() => {
-    if (!selectedAttachment || !selectedAttachment.type.startsWith('image/')) return null;
+  const selectedAttachmentUrl = React.useMemo(() => {
+    if (!selectedAttachment) return null;
     return URL.createObjectURL(selectedAttachment);
   }, [selectedAttachment]);
+  const attachmentPreviewUrl = selectedAttachment && selectedAttachment.type.startsWith('image/')
+    ? selectedAttachmentUrl
+    : null;
 
   const { data: companiesData } = useQuery({
     queryKey: ['companies-for-whatsapp'],
@@ -109,6 +134,30 @@ const CrmWhatsappInboxPage: React.FC = () => {
 
   const chatTemplateSelection = parseTemplateKey(selectedTemplateKey);
   const broadcastTemplateSelection = parseTemplateKey(broadcastTemplateKey);
+  const resolveTemplateHeaderFormat = (
+    components?: Array<{ type?: string | null; format?: string | null }> | null,
+    fallback?: string | null,
+  ) => {
+    const headerComponent = Array.isArray(components)
+      ? components.find((component) => String(component?.type || '').toUpperCase() === 'HEADER')
+      : null;
+
+    const resolved = String(headerComponent?.format || fallback || 'NONE').toUpperCase();
+    return ['TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT'].includes(resolved) ? resolved : 'NONE';
+  };
+  const getTemplateHeaderAccept = (headerFormat: string) => {
+    if (headerFormat === 'IMAGE') return 'image/jpeg,image/jpg,image/png';
+    if (headerFormat === 'VIDEO') return 'video/mp4';
+    if (headerFormat === 'DOCUMENT') return 'application/pdf,.pdf';
+    return '';
+  };
+  const getTemplateHeaderLabel = (headerFormat: string) => {
+    if (headerFormat === 'IMAGE') return 'Imagen';
+    if (headerFormat === 'VIDEO') return 'Video';
+    if (headerFormat === 'DOCUMENT') return 'Documento';
+    if (headerFormat === 'TEXT') return 'Texto';
+    return 'Sin header';
+  };
 
   const { data: chatTemplatePreview } = useQuery({
     queryKey: ['whatsapp-template-preview-chat', resolvedCompanyId, chatTemplateSelection?.name, chatTemplateSelection?.language],
@@ -174,21 +223,110 @@ const CrmWhatsappInboxPage: React.FC = () => {
   });
 
   React.useEffect(() => {
-    if (conversations.length > 0 && !activeConversationId) {
+    if (conversations.length > 0 && !activeConversationId && !directChatTarget) {
       setActiveConversationId(conversations[0].id);
     }
-    if (conversations.length === 0) {
+    if (conversations.length === 0 && !directChatTarget) {
       setActiveConversationId(null);
     }
-  }, [conversations, activeConversationId]);
+  }, [conversations, activeConversationId, directChatTarget]);
 
   const activeConversation = conversations.find((item) => item.id === activeConversationId) ?? null;
+  const virtualConversation = React.useMemo<WhatsappConversation | null>(() => {
+    if (!directChatTarget) return null;
+
+    return {
+      id: `draft:${directChatTarget.phone}`,
+      client_id: directChatTarget.clientId ?? null,
+      contact_name: directChatTarget.contactName,
+      contact_phone: directChatTarget.phone,
+      unread_count: 0,
+      status: 'open',
+      client: null,
+    };
+  }, [directChatTarget]);
+  const chatConversation = activeConversation ?? virtualConversation;
+  const hasChatTarget = Boolean(chatConversation);
   const activeClientType = activeConversation?.client?.client_type;
-  const activeClientLabel = activeClientType === 'person'
-    ? 'Persona'
-    : activeClientType === 'company'
-      ? `Empresa: ${activeConversation?.client?.name || 'Sin nombre'}`
-      : 'Contacto WhatsApp';
+  const activeClientLabel = directChatTarget && !activeConversation
+    ? (directChatTarget.clientId ? 'Cliente asociado · chat nuevo' : 'Contacto independiente · chat nuevo')
+    : activeClientType === 'person'
+      ? 'Persona'
+      : activeClientType === 'company'
+        ? `Empresa: ${activeConversation?.client?.name || 'Sin nombre'}`
+        : 'Contacto WhatsApp';
+
+  React.useEffect(() => {
+    if (!requestedCompanyId || selectedCompanyId === requestedCompanyId) return;
+    setSelectedCompanyId(requestedCompanyId);
+  }, [requestedCompanyId, selectedCompanyId]);
+
+  React.useEffect(() => {
+    if (!resolvedCompanyId || requestedPhone === '') return;
+    if (requestedCompanyId && resolvedCompanyId !== requestedCompanyId) return;
+
+    setActiveTab('chat');
+
+    const matchingConversation = conversations.find(
+      (conversation) => normalizePhoneValue(conversation.contact_phone) === requestedPhone,
+    );
+
+    if (matchingConversation) {
+      if (activeConversationId !== matchingConversation.id) {
+        setActiveConversationId(matchingConversation.id);
+      }
+      if (directChatTarget) {
+        setDirectChatTarget(null);
+      }
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete('phone');
+        next.delete('contact_name');
+        next.delete('client_id');
+        return next;
+      }, { replace: true });
+      return;
+    }
+
+    setActiveConversationId(null);
+    setDirectChatTarget({
+      phone: requestedPhone,
+      contactName: requestedContactName || requestedPhone,
+      companyId: resolvedCompanyId,
+      clientId: requestedClientId,
+    });
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('phone');
+      next.delete('contact_name');
+      next.delete('client_id');
+      return next;
+    }, { replace: true });
+  }, [
+    activeConversationId,
+    conversations,
+    directChatTarget,
+    requestedClientId,
+    requestedCompanyId,
+    requestedContactName,
+    requestedPhone,
+    resolvedCompanyId,
+    setSearchParams,
+  ]);
+
+  React.useEffect(() => {
+    if (!pendingConversationPhone) return;
+
+    const matchingConversation = conversations.find(
+      (conversation) => normalizePhoneValue(conversation.contact_phone) === pendingConversationPhone,
+    );
+
+    if (!matchingConversation) return;
+
+    setActiveConversationId(matchingConversation.id);
+    setDirectChatTarget(null);
+    setPendingConversationPhone(null);
+  }, [conversations, pendingConversationPhone]);
 
   React.useEffect(() => {
     const markAsRead = async () => {
@@ -217,32 +355,80 @@ const CrmWhatsappInboxPage: React.FC = () => {
 
   React.useEffect(() => {
     return () => {
-      if (attachmentPreviewUrl) {
-        URL.revokeObjectURL(attachmentPreviewUrl);
+      if (selectedAttachmentUrl) {
+        URL.revokeObjectURL(selectedAttachmentUrl);
       }
     };
-  }, [attachmentPreviewUrl]);
+  }, [selectedAttachmentUrl]);
 
   React.useEffect(() => {
     setIsEmojiPickerOpen(false);
     setSelectedAttachment(null);
+    setSelectedTemplateHeaderMedia(null);
     if (attachmentInputRef.current) {
       attachmentInputRef.current.value = '';
     }
-  }, [activeConversationId, isTemplateComposerOpen]);
+    if (templateHeaderMediaInputRef.current) {
+      templateHeaderMediaInputRef.current.value = '';
+    }
+  }, [activeConversationId, directChatTarget?.phone, isTemplateComposerOpen]);
+
+  React.useEffect(() => {
+    setSelectedTemplateHeaderMedia(null);
+    if (templateHeaderMediaInputRef.current) {
+      templateHeaderMediaInputRef.current.value = '';
+    }
+  }, [selectedTemplateKey]);
+
+  React.useEffect(() => {
+    setBroadcastTemplateHeaderMedia(null);
+    if (broadcastTemplateHeaderMediaInputRef.current) {
+      broadcastTemplateHeaderMediaInputRef.current.value = '';
+    }
+  }, [broadcastTemplateKey]);
+
+  React.useEffect(() => {
+    if (!isEmojiPickerOpen) return;
+
+    const handlePointerDownOutside = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (emojiPickerContainerRef.current?.contains(target)) return;
+      setIsEmojiPickerOpen(false);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsEmojiPickerOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDownOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDownOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isEmojiPickerOpen]);
 
   const availableTemplates = React.useMemo(() => {
     const raw = Array.isArray(metaConfig?.templates) ? metaConfig?.templates : [];
     return raw
-      .filter((template) => template?.name && template?.is_active !== false)
+      .filter((template) => {
+        const status = String(template?.status || '').trim().toUpperCase();
+        return Boolean(template?.name) && template?.is_active !== false && (status === '' || status === 'APPROVED');
+      })
       .map((template) => ({
         name: String(template.name),
         language: String(template.language || 'es_CO'),
         label: String(template.label || template.name),
         body: String(template.body_text || template.body || ''),
+        headerFormat: String(template.header_format || 'NONE').toUpperCase(),
         components: Array.isArray(template.components) ? template.components : [],
       }));
   }, [metaConfig?.templates]);
+  const hasConfiguredTemplates = Array.isArray(metaConfig?.templates) && metaConfig.templates.length > 0;
 
   React.useEffect(() => {
     if (availableTemplates.length === 0) {
@@ -257,28 +443,40 @@ const CrmWhatsappInboxPage: React.FC = () => {
     const hasPreferred = preferredKey
       ? availableTemplates.some((template) => `${template.name}::${template.language}` === preferredKey)
       : false;
+    const fallbackKey = hasPreferred && preferredKey
+      ? preferredKey
+      : `${availableTemplates[0].name}::${availableTemplates[0].language}`;
+    const hasSelectedTemplate = selectedTemplateKey
+      ? availableTemplates.some((template) => `${template.name}::${template.language}` === selectedTemplateKey)
+      : false;
+    const hasSelectedBroadcastTemplate = broadcastTemplateKey
+      ? availableTemplates.some((template) => `${template.name}::${template.language}` === broadcastTemplateKey)
+      : false;
 
-    if (hasPreferred && preferredKey) {
-      setSelectedTemplateKey(preferredKey);
-      setBroadcastTemplateKey((prev) => prev || preferredKey);
-      return;
+    if (!hasSelectedTemplate) {
+      setSelectedTemplateKey(fallbackKey);
     }
 
-    if (!selectedTemplateKey) {
-      setSelectedTemplateKey(`${availableTemplates[0].name}::${availableTemplates[0].language}`);
-    }
-    if (!broadcastTemplateKey) {
-      setBroadcastTemplateKey(`${availableTemplates[0].name}::${availableTemplates[0].language}`);
+    if (!hasSelectedBroadcastTemplate) {
+      setBroadcastTemplateKey(fallbackKey);
     }
   }, [availableTemplates, metaConfig?.default_template_language, metaConfig?.default_template_name, selectedTemplateKey, broadcastTemplateKey]);
+
+  const selectedChatTemplate = availableTemplates.find((template) => `${template.name}::${template.language}` === selectedTemplateKey) ?? null;
+  const selectedBroadcastTemplate = availableTemplates.find((template) => `${template.name}::${template.language}` === broadcastTemplateKey) ?? null;
+  const chatTemplateHeaderFormat = resolveTemplateHeaderFormat(chatTemplatePreview?.components, selectedChatTemplate?.headerFormat);
+  const broadcastTemplateHeaderFormat = resolveTemplateHeaderFormat(
+    broadcastTemplatePreview?.components,
+    selectedBroadcastTemplate?.headerFormat,
+  );
 
   React.useEffect(() => {
     setTemplateVariables((prev) => {
       const next = [...prev];
-      next[0] = activeConversation?.contact_name || activeConversation?.client?.name || '';
+      next[0] = chatConversation?.contact_name || chatConversation?.client?.name || '';
       return next;
     });
-  }, [activeConversation?.client?.name, activeConversation?.contact_name]);
+  }, [chatConversation?.client?.name, chatConversation?.contact_name]);
 
   React.useEffect(() => {
     if (!broadcastCountryId) {
@@ -321,10 +519,10 @@ const CrmWhatsappInboxPage: React.FC = () => {
     if (indexes.length === 0) return;
 
     setTemplateVariables((prev) =>
-      indexes.map((index) => prev[index - 1] ?? (index === 1 ? (activeConversation?.contact_name || activeConversation?.client?.name || '') : ''))
+      indexes.map((index) => prev[index - 1] ?? (index === 1 ? (chatConversation?.contact_name || chatConversation?.client?.name || '') : ''))
     );
     setChatVariableSources((prev) => indexes.map((_, index) => prev[index] ?? 'manual'));
-  }, [chatTemplatePreview?.variable_indexes, activeConversation?.contact_name, activeConversation?.client?.name]);
+  }, [chatConversation?.contact_name, chatConversation?.client?.name, chatTemplatePreview?.variable_indexes]);
 
   React.useEffect(() => {
     const indexes = broadcastTemplatePreview?.variable_indexes ?? [];
@@ -338,7 +536,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
 
   const resolveSourceValue = (mode: 'chat' | 'broadcast', source: string): string => {
     if (mode === 'chat') {
-      if (source === 'contact_name') return activeConversation?.contact_name || activeConversation?.client?.name || '';
+      if (source === 'contact_name') return chatConversation?.contact_name || chatConversation?.client?.name || '';
       if (source === 'company_name') return activeConversation?.client?.company?.name || selectedCompanyName;
       if (source === 'country') return selectedCountryName;
       if (source === 'state') return selectedStateName;
@@ -367,8 +565,31 @@ const CrmWhatsappInboxPage: React.FC = () => {
   };
 
   const appendEmojiToDraft = (emoji: string) => {
-    setMessageDraft((prev) => `${prev}${emoji}`);
+    const input = messageInputRef.current;
+
+    if (!input) {
+      setMessageDraft((prev) => `${prev}${emoji}`);
+      setIsEmojiPickerOpen(false);
+      return;
+    }
+
+    const currentValue = input.value;
+    const selectionStart = input.selectionStart ?? currentValue.length;
+    const selectionEnd = input.selectionEnd ?? currentValue.length;
+    const nextValue = `${currentValue.slice(0, selectionStart)}${emoji}${currentValue.slice(selectionEnd)}`;
+
+    setMessageDraft(nextValue);
     setIsEmojiPickerOpen(false);
+
+    window.requestAnimationFrame(() => {
+      input.focus();
+      const nextCaretPosition = selectionStart + emoji.length;
+      input.setSelectionRange(nextCaretPosition, nextCaretPosition);
+    });
+  };
+
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    appendEmojiToDraft(emojiData.emoji);
   };
 
   const templateSourceOptions = [
@@ -381,9 +602,13 @@ const CrmWhatsappInboxPage: React.FC = () => {
   ];
 
   const handleSendMessage = async (mode: 'text' | 'template') => {
-    if (!resolvedCompanyId || !activeConversation) return;
+    if (!resolvedCompanyId || !chatConversation) return;
     if (mode === 'text' && !messageDraft.trim() && !selectedAttachment) return;
     if (mode === 'template' && !selectedTemplateKey) return;
+    if (mode === 'template' && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(chatTemplateHeaderFormat) && !selectedTemplateHeaderMedia) {
+      toast.error(`La plantilla requiere un archivo de header tipo ${getTemplateHeaderLabel(chatTemplateHeaderFormat).toLowerCase()}`);
+      return;
+    }
 
     setSendingMessage(true);
     try {
@@ -395,12 +620,14 @@ const CrmWhatsappInboxPage: React.FC = () => {
         template_name?: string;
         template_language?: string;
         template_body_text?: string;
+        template_header_format?: string;
+        template_header_media?: File | null;
         template_variables?: string[];
         attachment?: File | null;
       } = {
         company_id: resolvedCompanyId,
-        conversation_id: activeConversation.id,
-        to: activeConversation.contact_phone || undefined,
+        conversation_id: activeConversation?.id,
+        to: chatConversation.contact_phone || undefined,
       };
 
       if (mode === 'template') {
@@ -408,6 +635,8 @@ const CrmWhatsappInboxPage: React.FC = () => {
         payload.template_name = templateName;
         payload.template_language = templateLanguage || 'es_CO';
         payload.template_body_text = chatTemplatePreview?.body_text || undefined;
+        payload.template_header_format = chatTemplateHeaderFormat;
+        payload.template_header_media = selectedTemplateHeaderMedia;
         payload.template_variables = [...templateVariables];
       } else {
         payload.message = messageDraft.trim() || undefined;
@@ -422,11 +651,19 @@ const CrmWhatsappInboxPage: React.FC = () => {
       setIsEmojiPickerOpen(false);
       if (mode === 'template') {
         setTemplateVariables((prev) =>
-          prev.map((_, index) => (index === 0 ? (activeConversation?.contact_name || activeConversation?.client?.name || '') : ''))
+          prev.map((_, index) => (index === 0 ? (chatConversation?.contact_name || chatConversation?.client?.name || '') : ''))
         );
+        setSelectedTemplateHeaderMedia(null);
+        if (templateHeaderMediaInputRef.current) {
+          templateHeaderMediaInputRef.current.value = '';
+        }
         setIsTemplateComposerOpen(false);
       }
-      await queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', resolvedCompanyId, activeConversation.id] });
+      if (activeConversation?.id) {
+        await queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', resolvedCompanyId, activeConversation.id] });
+      } else if (chatConversation.contact_phone) {
+        setPendingConversationPhone(normalizePhoneValue(chatConversation.contact_phone));
+      }
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-conversations', resolvedCompanyId] });
       toast.success('Mensaje enviado correctamente');
     } catch (error: any) {
@@ -449,6 +686,8 @@ const CrmWhatsappInboxPage: React.FC = () => {
       template_name?: string;
       template_language?: string;
       template_body_text?: string;
+      template_header_format?: string;
+      template_header_media?: File | null;
       template_variables?: string[];
       template_variable_sources?: string[];
       recipient_client_id?: number;
@@ -469,10 +708,16 @@ const CrmWhatsappInboxPage: React.FC = () => {
         toast.error('Selecciona una plantilla');
         return;
       }
+      if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(broadcastTemplateHeaderFormat) && !broadcastTemplateHeaderMedia) {
+        toast.error(`La plantilla requiere un archivo de header tipo ${getTemplateHeaderLabel(broadcastTemplateHeaderFormat).toLowerCase()}`);
+        return;
+      }
       const [templateName = '', templateLanguage = 'es_CO'] = broadcastTemplateKey.split('::');
       payload.template_name = templateName;
       payload.template_language = templateLanguage || 'es_CO';
       payload.template_body_text = broadcastTemplatePreview?.body_text || undefined;
+      payload.template_header_format = broadcastTemplateHeaderFormat;
+      payload.template_header_media = broadcastTemplateHeaderMedia;
       payload.template_variables = [...broadcastTemplateVariables];
       payload.template_variable_sources = [...broadcastVariableSources];
     } else {
@@ -528,6 +773,10 @@ const CrmWhatsappInboxPage: React.FC = () => {
       setBroadcastTemplateVariables((prev) =>
         prev.map((_, index) => (index === 0 ? (selectedBroadcastClient?.name || user?.name || '') : ''))
       );
+      setBroadcastTemplateHeaderMedia(null);
+      if (broadcastTemplateHeaderMediaInputRef.current) {
+        broadcastTemplateHeaderMediaInputRef.current.value = '';
+      }
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-conversations', resolvedCompanyId] });
       toast.success('Envío ejecutado correctamente');
     } catch (error: any) {
@@ -540,7 +789,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    if (!activeConversationId || !messageDraft.trim() || sendingMessage) return;
+    if (!hasChatTarget || !messageDraft.trim() || sendingMessage) return;
     void handleSendMessage('text');
   };
 
@@ -565,7 +814,112 @@ const CrmWhatsappInboxPage: React.FC = () => {
       return resolvedValue || `{{${indexText}}}`;
     });
   };
+  const getMetaErrorInfo = (message: typeof messages[number]) => {
+    const meta = message.meta;
+    if (!meta) return { code: null as number | null, text: '' };
+
+    const parseCode = (value: unknown): number | null => {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) return Number(value);
+      return null;
+    };
+
+    const candidates = [
+      {
+        code: parseCode(meta.body?.error?.code),
+        text: String(meta.body?.error?.error_user_msg || meta.body?.error?.message || meta.body?.error?.error_data?.details || '').trim(),
+      },
+      {
+        code: parseCode(meta.errors?.[0]?.code),
+        text: String(meta.errors?.[0]?.message || meta.errors?.[0]?.title || meta.errors?.[0]?.error_data?.details || '').trim(),
+      },
+      {
+        code: parseCode(meta.body?.errors?.[0]?.code),
+        text: String(meta.body?.errors?.[0]?.message || meta.body?.errors?.[0]?.title || meta.body?.errors?.[0]?.error_data?.details || '').trim(),
+      },
+      {
+        code: parseCode(meta.fallback?.body?.error?.code),
+        text: String(meta.fallback?.body?.error?.error_user_msg || meta.fallback?.body?.error?.message || meta.fallback?.body?.error?.error_data?.details || '').trim(),
+      },
+    ];
+
+    const firstMatch = candidates.find((candidate) => candidate.code !== null || candidate.text !== '');
+    return firstMatch ?? { code: null, text: '' };
+  };
+  const getMessageFailureReason = (message: typeof messages[number]) => {
+    if (message.direction !== 'outbound' || message.status !== 'failed') return null;
+
+    const meta = message.meta;
+    const reason = String(meta?.reason || meta?.fallback?.reason || '').trim();
+    const { code, text } = getMetaErrorInfo(message);
+    const normalizedText = text.toLowerCase();
+
+    if (
+      code === 131047 ||
+      code === 470 ||
+      reason === 'missing_default_template' ||
+      normalizedText.includes('outside the allowed window') ||
+      normalizedText.includes('outside the customer care window') ||
+      normalizedText.includes('24-hour') ||
+      normalizedText.includes('24 hour') ||
+      normalizedText.includes('template message')
+    ) {
+      return 'Fuera de la ventana de 24 horas. Debes enviar una plantilla aprobada.';
+    }
+
+    if (reason === 'missing_config') {
+      return 'La configuración de WhatsApp de la compañía está incompleta.';
+    }
+
+    if (reason === 'unsupported_attachment_type') {
+      return 'El tipo de archivo adjunto no es compatible con WhatsApp.';
+    }
+
+    if (reason === 'missing_default_template') {
+      return 'No hay una plantilla predeterminada configurada para mensajes fuera de 24 horas.';
+    }
+
+    if (text) {
+      return text;
+    }
+
+    return 'Meta rechazó el envío o la entrega del mensaje.';
+  };
+  const getMessageStatusLabel = (message: typeof messages[number]) => {
+    if (message.direction !== 'outbound') return '';
+
+    if (message.status === 'read') return 'Leido';
+    if (message.status === 'delivered') return 'Entregado';
+    if (message.status === 'failed') return 'No entregado';
+    if (message.status === 'sent') return 'Aceptado por Meta';
+    return String(message.status || 'En proceso');
+  };
+  const getMessageStatusClassName = (message: typeof messages[number]) => {
+    if (message.status === 'read') return message.direction === 'outbound' ? 'text-primary-content/85' : 'text-success';
+    if (message.status === 'delivered') return message.direction === 'outbound' ? 'text-primary-content/80' : 'text-info';
+    if (message.status === 'failed') return 'text-error';
+    return message.direction === 'outbound' ? 'text-primary-content/80' : 'text-base-content/60';
+  };
+  const getMessageChannelHint = (message: typeof messages[number]) => {
+    if (message.direction !== 'outbound') return null;
+    if (message.meta?.channel === 'template_fallback') {
+      return 'Enviado con plantilla por ventana cerrada';
+    }
+    return null;
+  };
   const getMessageAttachment = (message: typeof messages[number]) => message?.meta?.attachment ?? null;
+  const getAttachmentOpenLabel = (kind?: string | null) => {
+    if (kind === 'image') return 'Abrir imagen';
+    if (kind === 'video') return 'Abrir video';
+    if (kind === 'audio') return 'Abrir audio';
+    return 'Abrir archivo';
+  };
+  const getAttachmentFallbackLabel = (kind?: string | null) => {
+    if (kind === 'image') return 'Imagen recibida';
+    if (kind === 'video') return 'Video recibido';
+    if (kind === 'audio') return 'Audio recibido';
+    return 'Archivo adjunto';
+  };
   const shouldRenderMessageBody = (message: typeof messages[number]) => {
     const body = String(message.body || '').trim();
     if (!body) return false;
@@ -589,7 +943,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
   const tabButtonActiveClass = 'border-primary text-primary bg-base-100';
   const tabButtonInactiveClass = 'border-transparent text-base-content/70 hover:text-base-content hover:border-base-300';
   const isCompanyConfigured = Boolean(metaConfig?.is_configured);
-  const canOpenTemplateComposer = Boolean(activeConversationId) && availableTemplates.length > 0;
+  const canOpenTemplateComposer = hasChatTarget && availableTemplates.length > 0;
   const closeTemplateComposer = () => {
     if (sendingMessage) return;
     setIsTemplateComposerOpen(false);
@@ -717,7 +1071,10 @@ const CrmWhatsappInboxPage: React.FC = () => {
                                 ? 'border-primary bg-primary/8'
                                 : 'border-base-200 bg-base-50 hover:bg-base-100'
                             }`}
-                            onClick={() => setActiveConversationId(conversation.id)}
+                            onClick={() => {
+                              setDirectChatTarget(null);
+                              setActiveConversationId(conversation.id);
+                            }}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex min-w-0 items-start gap-2">
@@ -760,12 +1117,12 @@ const CrmWhatsappInboxPage: React.FC = () => {
                         </div>
                         <div>
                           <h2 className="text-lg font-semibold">
-                            {activeConversation?.contact_name || activeConversation?.contact_phone || 'Selecciona un chat'}
+                            {chatConversation?.contact_name || chatConversation?.contact_phone || 'Selecciona un chat'}
                           </h2>
                           <p className="text-sm text-base-content/60">
-                            {activeConversation?.contact_phone || 'No hay conversación activa'}
+                            {chatConversation?.contact_phone || 'No hay conversación activa'}
                           </p>
-                          {activeConversation && (
+                          {chatConversation && (
                             <p className="mt-1 text-xs text-base-content/70">{activeClientLabel}</p>
                           )}
                         </div>
@@ -777,7 +1134,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
                         <div className="py-10 text-center"><span className="loading loading-spinner loading-md" /></div>
                       ) : messages.length === 0 ? (
                         <div className="h-full flex items-center justify-center text-sm text-base-content/60">
-                          No hay mensajes para mostrar.
+                          {chatConversation ? 'No hay mensajes todavía. Puedes iniciar la conversación.' : 'No hay mensajes para mostrar.'}
                         </div>
                       ) : (
                         messages.map((message) => (
@@ -785,7 +1142,9 @@ const CrmWhatsappInboxPage: React.FC = () => {
                             key={message.id}
                             className={`max-w-[72%] rounded-2xl px-4 py-2 text-sm ${
                               message.direction === 'outbound'
-                                ? 'ml-auto bg-primary text-primary-content'
+                                ? message.status === 'failed'
+                                  ? 'ml-auto border border-error/30 bg-error/10 text-base-content'
+                                  : 'ml-auto bg-primary text-primary-content'
                                 : 'bg-base-200 text-base-content'
                             }`}
                           >
@@ -794,14 +1153,55 @@ const CrmWhatsappInboxPage: React.FC = () => {
                                 href={String(getMessageAttachment(message)?.url)}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="block overflow-hidden rounded-xl border border-white/10 bg-black/10"
+                                className="group block overflow-hidden rounded-xl border border-white/10 bg-black/10"
+                                title="Abrir imagen"
                               >
                                 <img
                                   src={String(getMessageAttachment(message)?.url)}
                                   alt={String(getMessageAttachment(message)?.file_name || 'Imagen adjunta')}
                                   className="max-h-72 w-full object-cover"
                                 />
+                                <div className="px-3 py-2 text-[11px] font-medium text-white/90 group-hover:underline">
+                                  Abrir imagen
+                                </div>
                               </a>
+                            ) : null}
+
+                            {getMessageAttachment(message)?.kind === 'video' && getMessageAttachment(message)?.url ? (
+                              <div className="overflow-hidden rounded-xl border border-white/10 bg-black/10">
+                                <video
+                                  controls
+                                  className="max-h-72 w-full object-cover"
+                                  src={String(getMessageAttachment(message)?.url)}
+                                />
+                                <a
+                                  href={String(getMessageAttachment(message)?.url)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block px-3 py-2 text-[11px] font-medium hover:underline"
+                                >
+                                  Abrir video
+                                </a>
+                              </div>
+                            ) : null}
+
+                            {getMessageAttachment(message)?.kind === 'audio' && getMessageAttachment(message)?.url ? (
+                              <div className="overflow-hidden rounded-xl border border-white/10 bg-black/10 px-3 py-3">
+                                <audio
+                                  controls
+                                  preload="metadata"
+                                  className="w-full max-w-full"
+                                  src={String(getMessageAttachment(message)?.url)}
+                                />
+                                <a
+                                  href={String(getMessageAttachment(message)?.url)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-2 block text-[11px] font-medium hover:underline"
+                                >
+                                  Abrir audio
+                                </a>
+                              </div>
                             ) : null}
 
                             {getMessageAttachment(message)?.kind === 'document' && getMessageAttachment(message)?.url ? (
@@ -811,20 +1211,57 @@ const CrmWhatsappInboxPage: React.FC = () => {
                                 rel="noreferrer"
                                 className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
                                   message.direction === 'outbound'
-                                    ? 'border-white/15 bg-white/10'
+                                    ? message.status === 'failed'
+                                      ? 'border-base-300 bg-base-100'
+                                      : 'border-white/15 bg-white/10'
                                     : 'border-base-300 bg-base-100'
                                 }`}
+                                title="Abrir archivo"
                               >
                                 <BiFile className="h-5 w-5 shrink-0" />
                                 <div className="min-w-0">
                                   <div className="truncate font-medium">
                                     {getMessageAttachment(message)?.file_name || 'Archivo adjunto'}
                                   </div>
-                                  <div className={`text-[11px] ${message.direction === 'outbound' ? 'text-primary-content/80' : 'text-base-content/60'}`}>
-                                    Descargar archivo
+                                  <div
+                                    className={`text-[11px] ${
+                                      message.direction === 'outbound' && message.status !== 'failed'
+                                        ? 'text-primary-content/80'
+                                        : 'text-base-content/60'
+                                    }`}
+                                  >
+                                    {getAttachmentOpenLabel(getMessageAttachment(message)?.kind)}
                                   </div>
                                 </div>
                               </a>
+                            ) : null}
+
+                            {getMessageAttachment(message) && !getMessageAttachment(message)?.url ? (
+                              <div
+                                className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
+                                  message.direction === 'outbound'
+                                    ? message.status === 'failed'
+                                      ? 'border-base-300 bg-base-100'
+                                      : 'border-white/15 bg-white/10'
+                                    : 'border-base-300 bg-base-100'
+                                }`}
+                              >
+                                <BiFile className="h-5 w-5 shrink-0" />
+                                <div className="min-w-0">
+                                  <div className="truncate font-medium">
+                                    {getMessageAttachment(message)?.file_name || getAttachmentFallbackLabel(getMessageAttachment(message)?.kind)}
+                                  </div>
+                                  <div
+                                    className={`text-[11px] ${
+                                      message.direction === 'outbound' && message.status !== 'failed'
+                                        ? 'text-primary-content/80'
+                                        : 'text-base-content/60'
+                                    }`}
+                                  >
+                                    {getMessageAttachment(message)?.mime_type || getAttachmentFallbackLabel(getMessageAttachment(message)?.kind)}
+                                  </div>
+                                </div>
+                              </div>
                             ) : null}
 
                             {shouldRenderMessageBody(message) && (
@@ -833,8 +1270,23 @@ const CrmWhatsappInboxPage: React.FC = () => {
                               </div>
                             )}
 
-                            <div className={`mt-1 text-[11px] ${message.direction === 'outbound' ? 'text-primary-content/80' : 'text-base-content/60'}`}>
-                              {message.sent_at ? new Date(message.sent_at).toLocaleString() : ''}
+                            <div className="mt-2 space-y-1">
+                              <div className={`text-[11px] ${getMessageStatusClassName(message)}`}>
+                                {message.sent_at ? new Date(message.sent_at).toLocaleString() : ''}
+                                {message.direction === 'outbound' ? ` · ${getMessageStatusLabel(message)}` : ''}
+                              </div>
+
+                              {getMessageChannelHint(message) && (
+                                <div className={`text-[11px] ${message.direction === 'outbound' && message.status !== 'failed' ? 'text-primary-content/80' : 'text-base-content/60'}`}>
+                                  {getMessageChannelHint(message)}
+                                </div>
+                              )}
+
+                              {getMessageFailureReason(message) && (
+                                <div className="text-[11px] text-error">
+                                  {getMessageFailureReason(message)}
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))
@@ -868,40 +1320,49 @@ const CrmWhatsappInboxPage: React.FC = () => {
                         {selectedAttachment && (
                           <div className="flex items-start gap-3 rounded-2xl border border-base-200 bg-base-50 p-3">
                             {attachmentPreviewUrl ? (
-                              <img
-                                src={attachmentPreviewUrl}
-                                alt={selectedAttachment.name}
-                                className="h-14 w-14 rounded-xl object-cover"
-                              />
+                              <a
+                                href={attachmentPreviewUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block h-14 w-14 overflow-hidden rounded-xl"
+                                title="Abrir imagen seleccionada"
+                              >
+                                <img
+                                  src={attachmentPreviewUrl}
+                                  alt={selectedAttachment.name}
+                                  className="h-14 w-14 rounded-xl object-cover"
+                                />
+                              </a>
                             ) : (
-                              <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-base-300 bg-base-100">
+                              <a
+                                href={selectedAttachmentUrl || '#'}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex h-14 w-14 items-center justify-center rounded-xl border border-base-300 bg-base-100"
+                                title="Abrir archivo seleccionado"
+                              >
                                 <BiFile className="h-6 w-6 text-base-content/60" />
-                              </div>
+                              </a>
                             )}
                             <div className="min-w-0 flex-1">
                               <div className="truncate text-sm font-medium">{selectedAttachment.name}</div>
                               <div className="text-xs text-base-content/60">
                                 {(selectedAttachment.size / 1024 / 1024).toFixed(2)} MB
                               </div>
+                              {selectedAttachmentUrl && (
+                                <a
+                                  href={selectedAttachmentUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-1 inline-flex text-xs font-medium text-primary hover:underline"
+                                >
+                                  {attachmentPreviewUrl ? 'Abrir imagen' : 'Abrir archivo'}
+                                </a>
+                              )}
                             </div>
                             <button type="button" className="btn btn-ghost btn-sm btn-square" onClick={clearSelectedAttachment}>
                               <BiX className="h-4 w-4" />
                             </button>
-                          </div>
-                        )}
-
-                        {isEmojiPickerOpen && (
-                          <div className="absolute bottom-full left-0 z-20 mb-2 grid w-[260px] grid-cols-6 gap-2 rounded-2xl border border-base-200 bg-base-100 p-3 shadow-xl">
-                            {QUICK_EMOJIS.map((emoji) => (
-                              <button
-                                key={emoji}
-                                type="button"
-                                className="btn btn-ghost btn-sm text-xl"
-                                onClick={() => appendEmojiToDraft(emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
                           </div>
                         )}
 
@@ -910,33 +1371,51 @@ const CrmWhatsappInboxPage: React.FC = () => {
                             type="button"
                             className="btn btn-ghost btn-square"
                             onClick={() => attachmentInputRef.current?.click()}
-                            disabled={!activeConversationId || sendingMessage}
+                            disabled={!hasChatTarget || sendingMessage}
                             title="Adjuntar archivo"
                           >
                             <BiPaperclip className="h-5 w-5" />
                           </button>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-square"
-                            onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
-                            disabled={!activeConversationId || sendingMessage}
-                            title="Agregar emoji"
-                          >
-                            <BiSmile className="h-5 w-5" />
-                          </button>
+                          <div ref={emojiPickerContainerRef} className="relative">
+                            {isEmojiPickerOpen && (
+                              <div className="absolute bottom-full left-0 z-20 mb-2 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-base-200 bg-base-100 shadow-xl">
+                                <EmojiPicker
+                                  open={isEmojiPickerOpen}
+                                  onEmojiClick={handleEmojiClick}
+                                  emojiStyle={EmojiStyle.NATIVE}
+                                  theme={Theme.AUTO}
+                                  width="100%"
+                                  height={420}
+                                  lazyLoadEmojis
+                                  searchPlaceholder="Buscar emoji"
+                                  previewConfig={{ showPreview: false }}
+                                />
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-square"
+                              onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
+                              disabled={!hasChatTarget || sendingMessage}
+                              title="Agregar emoji"
+                            >
+                              <BiSmile className="h-5 w-5" />
+                            </button>
+                          </div>
                           <input
+                            ref={messageInputRef}
                             className="input input-bordered w-full"
                             placeholder="Escribe un mensaje o agrega un archivo..."
                             value={messageDraft}
                             onChange={(event) => setMessageDraft(event.target.value)}
                             onKeyDown={handleComposerKeyDown}
-                            disabled={!activeConversationId || sendingMessage}
+                            disabled={!hasChatTarget || sendingMessage}
                           />
                           <button
                             type="button"
                             className="btn btn-primary"
                             onClick={() => void handleSendMessage('text')}
-                            disabled={!activeConversationId || (!messageDraft.trim() && !selectedAttachment) || sendingMessage}
+                            disabled={!hasChatTarget || (!messageDraft.trim() && !selectedAttachment) || sendingMessage}
                           >
                             <BiSend className="w-4 h-4" />
                           </button>
@@ -988,6 +1467,34 @@ const CrmWhatsappInboxPage: React.FC = () => {
                           isClearable={false}
                         />
                       </label>
+                      {availableTemplates.length === 0 && hasConfiguredTemplates && (
+                        <p className="text-xs text-base-content/60">
+                          No hay plantillas aprobadas disponibles todavía. Las plantillas pendientes aparecerán cuando Meta las apruebe.
+                        </p>
+                      )}
+                      {['IMAGE', 'VIDEO', 'DOCUMENT'].includes(broadcastTemplateHeaderFormat) && (
+                        <label className="form-control w-full">
+                          <span className="label-text mb-2">
+                            Archivo de header ({getTemplateHeaderLabel(broadcastTemplateHeaderFormat)})
+                          </span>
+                          <input
+                            ref={broadcastTemplateHeaderMediaInputRef}
+                            type="file"
+                            className="file-input file-input-bordered w-full"
+                            accept={getTemplateHeaderAccept(broadcastTemplateHeaderFormat)}
+                            onChange={(event) => setBroadcastTemplateHeaderMedia(event.target.files?.[0] ?? null)}
+                            disabled={sendingBroadcast}
+                          />
+                          <span className="mt-1 text-xs text-base-content/60">
+                            Esta plantilla requiere un archivo de encabezado para enviarse.
+                          </span>
+                          {broadcastTemplateHeaderMedia && (
+                            <span className="mt-1 text-xs text-base-content/70">
+                              Archivo seleccionado: {broadcastTemplateHeaderMedia.name}
+                            </span>
+                          )}
+                        </label>
+                      )}
                       <div className="grid grid-cols-1 gap-2">
                         {(broadcastTemplatePreview?.variable_indexes ?? []).map((variableNumber, index) => (
                           <div key={`broadcast-template-var-${variableNumber}`} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_220px]">
@@ -1269,10 +1776,38 @@ const CrmWhatsappInboxPage: React.FC = () => {
                   value={selectedTemplateKey}
                   onChange={(value) => setSelectedTemplateKey(value ? String(value) : null)}
                   placeholder="Selecciona una plantilla"
-                  isDisabled={!activeConversationId || sendingMessage || availableTemplates.length === 0}
+                  isDisabled={!hasChatTarget || sendingMessage || availableTemplates.length === 0}
                   isClearable={false}
                 />
               </label>
+              {availableTemplates.length === 0 && hasConfiguredTemplates && (
+                <p className="text-xs text-base-content/60">
+                  No hay plantillas aprobadas disponibles todavía. Las plantillas pendientes aparecerán cuando Meta las apruebe.
+                </p>
+              )}
+              {['IMAGE', 'VIDEO', 'DOCUMENT'].includes(chatTemplateHeaderFormat) && (
+                <label className="form-control w-full">
+                  <span className="label-text mb-2">
+                    Archivo de header ({getTemplateHeaderLabel(chatTemplateHeaderFormat)})
+                  </span>
+                  <input
+                    ref={templateHeaderMediaInputRef}
+                    type="file"
+                    className="file-input file-input-bordered w-full"
+                    accept={getTemplateHeaderAccept(chatTemplateHeaderFormat)}
+                    onChange={(event) => setSelectedTemplateHeaderMedia(event.target.files?.[0] ?? null)}
+                    disabled={!hasChatTarget || sendingMessage}
+                  />
+                  <span className="mt-1 text-xs text-base-content/60">
+                    Esta plantilla requiere un archivo de encabezado para enviarse.
+                  </span>
+                  {selectedTemplateHeaderMedia && (
+                    <span className="mt-1 text-xs text-base-content/70">
+                      Archivo seleccionado: {selectedTemplateHeaderMedia.name}
+                    </span>
+                  )}
+                </label>
+              )}
 
               <div className="grid grid-cols-1 gap-3">
                 {(chatTemplatePreview?.variable_indexes ?? []).map((variableNumber, index) => (
@@ -1288,7 +1823,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
                           nextValues[variableNumber - 1] = event.target.value;
                           setTemplateVariables(nextValues);
                         }}
-                        disabled={!activeConversationId || sendingMessage}
+                        disabled={!hasChatTarget || sendingMessage}
                       />
                     </label>
                     <label className="form-control w-full">
@@ -1310,7 +1845,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
                           }
                         }}
                         placeholder="Manual"
-                        isDisabled={!activeConversationId || sendingMessage}
+                        isDisabled={!hasChatTarget || sendingMessage}
                         isClearable={false}
                       />
                     </label>
@@ -1338,7 +1873,7 @@ const CrmWhatsappInboxPage: React.FC = () => {
                 type="button"
                 className="btn btn-primary"
                 onClick={() => void handleSendMessage('template')}
-                disabled={!activeConversationId || !selectedTemplateKey || sendingMessage}
+                disabled={!hasChatTarget || !selectedTemplateKey || sendingMessage}
               >
                 <BiSend className="w-4 h-4" />
                 {sendingMessage ? 'Enviando...' : 'Enviar plantilla'}

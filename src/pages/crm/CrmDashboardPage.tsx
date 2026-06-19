@@ -3,9 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { BiCheckCircle, BiListUl, BiPlus, BiTimeFive, BiUser } from 'react-icons/bi';
 import { crmService } from '../../services/crmService';
+import { useAuthStore } from '../../stores/authStore';
+import type { CrmActivity } from '../../types/crm';
+
+const getActivityTargetLabel = (activity: CrmActivity) => {
+  return activity.client?.name || activity.crmContact?.name || activity.contact_name || (activity.client_id ? `Cliente #${activity.client_id}` : 'Contacto');
+};
 
 const CrmDashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const hasPermission = useAuthStore((state) => state.hasPermission);
+  const canSeeContacts = hasPermission('crm.contacts.list');
   const { data, isLoading } = useQuery({
     queryKey: ['crm-dashboard-activities'],
     queryFn: () => crmService.getActivities({ per_page: 200 }),
@@ -27,6 +35,11 @@ const CrmDashboardPage: React.FC = () => {
           <p className="text-base-content/60">Resumen de gestiones comerciales por cliente.</p>
         </div>
         <div className="flex gap-2">
+          {canSeeContacts && (
+            <button className="btn btn-outline" onClick={() => navigate('/contacts')}>
+              Contactos
+            </button>
+          )}
           <button className="btn btn-outline" onClick={() => navigate('/crm/gestiones')}>
             Ver gestiones
           </button>
@@ -67,7 +80,7 @@ const CrmDashboardPage: React.FC = () => {
               >
                 <div className="font-semibold">{activity.subject}</div>
                 <div className="text-sm text-base-content/60">
-                  {activity.client?.name || `Cliente #${activity.client_id}`} • {activity.assignedUser?.name || 'Sin responsable'}
+                  {getActivityTargetLabel(activity)} • {activity.assignedUser?.name || 'Sin responsable'}
                 </div>
               </button>
             ))}

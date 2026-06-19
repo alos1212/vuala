@@ -5,6 +5,7 @@ import type { ClientCategory } from './clientCategory';
 export interface ClientContact {
   id: number;
   client_id: number;
+  company_id?: number;
   name: string;
   position?: string | null;
   email?: string | null;
@@ -12,6 +13,9 @@ export interface ClientContact {
   is_primary?: boolean;
   is_active?: boolean;
   status?: number | string | null;
+  address?: string | null;
+  notes?: string | null;
+  activities_count?: number;
 }
 
 export interface Client {

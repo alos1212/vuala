@@ -477,7 +477,7 @@ const ClientFormPage: React.FC = () => {
               <p className="text-sm text-base-content/60">
                 {selectedClientType === 'person'
                   ? 'Para clientes tipo persona se creará automáticamente un único contacto con los mismos datos del cliente.'
-                  : 'Puedes crear contactos del cliente en este mismo paso.'}
+                  : 'Puedes crear contactos de la compañía asociados a este cliente en este mismo paso.'}
               </p>
             </div>
 

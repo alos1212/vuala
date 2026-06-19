@@ -93,7 +93,7 @@ const ClientDetailPage: React.FC = () => {
       <section className="rounded-3xl border border-base-200 bg-base-100 p-6 shadow space-y-4">
         <div>
           <h2 className="text-xl font-semibold">Contactos del cliente</h2>
-          <p className="text-sm text-base-content/60">Estos contactos no tienen acceso al sistema.</p>
+          <p className="text-sm text-base-content/60">Estos contactos pertenecen a la compañía y quedan asociados opcionalmente a este cliente.</p>
         </div>
 
         {client.client_type !== 'person' && (

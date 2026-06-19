@@ -25,15 +25,58 @@ export interface WhatsappMessage {
   body: string;
   sent_at: string;
   status?: 'sent' | 'delivered' | 'read' | 'failed' | string;
+  delivered_at?: string | null;
+  read_at?: string | null;
   meta?: {
     attachment?: {
-      kind?: 'image' | 'document' | string;
+      kind?: 'image' | 'video' | 'audio' | 'document' | string;
       url?: string | null;
       file_name?: string | null;
       mime_type?: string | null;
       size?: number | null;
       caption?: string | null;
       media_id?: string | null;
+    } | null;
+    channel?: string | null;
+    reason?: string | null;
+    errors?: Array<{
+      code?: number | string | null;
+      title?: string | null;
+      message?: string | null;
+      error_data?: {
+        details?: string | null;
+      } | null;
+    }>;
+    body?: {
+      error?: {
+        code?: number | string | null;
+        message?: string | null;
+        error_user_msg?: string | null;
+        error_data?: {
+          details?: string | null;
+        } | null;
+      } | null;
+      errors?: Array<{
+        code?: number | string | null;
+        title?: string | null;
+        message?: string | null;
+        error_data?: {
+          details?: string | null;
+        } | null;
+      }>;
+    } | null;
+    fallback?: {
+      reason?: string | null;
+      body?: {
+        error?: {
+          code?: number | string | null;
+          message?: string | null;
+          error_user_msg?: string | null;
+          error_data?: {
+            details?: string | null;
+          } | null;
+        } | null;
+      } | null;
     } | null;
     [key: string]: unknown;
   } | null;
@@ -58,9 +101,13 @@ export interface WhatsappMetaConfig {
     is_active?: boolean;
     body?: string | null;
     body_text?: string | null;
+    header_format?: 'NONE' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | string | null;
+    status?: string | null;
+    rejection_reason?: string | null;
     components?: Array<{
       type?: string | null;
       text?: string | null;
+      format?: string | null;
     }>;
   }>;
   updated_at?: string | null;
@@ -73,6 +120,8 @@ export interface WhatsappBroadcastPayload {
   template_name?: string;
   template_language?: string;
   template_body_text?: string;
+  template_header_format?: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | 'NONE' | string;
+  template_header_media?: File | null;
   template_variables?: string[];
   template_variable_sources?: string[];
   recipient_client_id?: number;
@@ -91,11 +140,13 @@ export interface WhatsappTemplatePreview {
   status?: string;
   category?: string;
   body_text: string;
+  header_format?: 'NONE' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | string;
   variable_indexes: number[];
   variable_count: number;
   components?: Array<{
     type?: string | null;
     text?: string | null;
+    format?: string | null;
   }>;
 }
 
@@ -106,5 +157,7 @@ export interface WhatsappCreateTemplatePayload {
   category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
   body_text: string;
   label?: string;
+  header_format?: 'NONE' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | string;
+  header_media_sample?: File | null;
   example_values?: string[];
 }
