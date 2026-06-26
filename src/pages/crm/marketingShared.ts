@@ -26,8 +26,6 @@ export const getEmptyCampaignForm = (companyId?: number | null): CrmEmailCampaig
     city_id: null,
     role_id: null,
   },
-  from_name: '',
-  from_email: '',
   reply_to_email: '',
   reply_to_name: '',
   subject_override: '',

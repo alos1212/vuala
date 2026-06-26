@@ -62,8 +62,6 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
         only_active: campaign.audience_filters?.only_active ?? true,
         only_primary: campaign.audience_filters?.only_primary ?? false,
       },
-      from_name: campaign.from_name ?? '',
-      from_email: campaign.from_email ?? '',
       reply_to_email: campaign.reply_to_email ?? '',
       reply_to_name: campaign.reply_to_name ?? '',
       subject_override: campaign.subject_override ?? '',
@@ -467,14 +465,6 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
         <section className="rounded-3xl border border-base-200 bg-base-100 p-5 shadow">
           <h2 className="mb-4 text-lg font-semibold">Configuración de envío</h2>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium">From name</label>
-              <input className="input input-bordered w-full" value={campaignForm.from_name ?? ''} onChange={(event) => setCampaignForm((current) => ({ ...current, from_name: event.target.value }))} placeholder="Equipo Vuala" />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium">From email</label>
-              <input className="input input-bordered w-full" value={campaignForm.from_email ?? ''} onChange={(event) => setCampaignForm((current) => ({ ...current, from_email: event.target.value }))} placeholder="news@tu-dominio.com" />
-            </div>
             <div>
               <label className="mb-2 block text-sm font-medium">Reply-to name</label>
               <input className="input input-bordered w-full" value={campaignForm.reply_to_name ?? ''} onChange={(event) => setCampaignForm((current) => ({ ...current, reply_to_name: event.target.value }))} />

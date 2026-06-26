@@ -149,8 +149,6 @@ export interface CrmEmailCampaign {
     only_active?: boolean;
     only_primary?: boolean;
   } | null;
-  from_name?: string | null;
-  from_email?: string | null;
   reply_to_email?: string | null;
   reply_to_name?: string | null;
   subject_override?: string | null;
@@ -187,8 +185,6 @@ export interface CrmEmailCampaignPayload {
     only_active?: boolean;
     only_primary?: boolean;
   };
-  from_name?: string | null;
-  from_email?: string | null;
   reply_to_email?: string | null;
   reply_to_name?: string | null;
   subject_override?: string | null;
