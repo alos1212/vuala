@@ -105,3 +105,129 @@ export interface CrmActivityPayload {
   requires_follow_up?: boolean;
   result_notes?: string;
 }
+
+export interface CrmEmailTemplate {
+  id: number;
+  company_id: number;
+  name: string;
+  slug: string;
+  subject: string;
+  preheader?: string | null;
+  body_html: string;
+  body_text?: string | null;
+  is_active?: boolean;
+  status?: number;
+  company?: Pick<Company, 'id' | 'name'> | null;
+  creator?: Pick<User, 'id' | 'name'> | null;
+  updater?: Pick<User, 'id' | 'name'> | null;
+}
+
+export interface CrmEmailTemplatePayload {
+  company_id?: number | null;
+  name: string;
+  slug?: string;
+  subject: string;
+  preheader?: string | null;
+  body_html: string;
+  body_text?: string | null;
+  is_active?: boolean;
+}
+
+export interface CrmEmailCampaign {
+  id: number;
+  company_id: number;
+  template_id: number;
+  name: string;
+  status: 'draft' | 'scheduled' | 'processing' | 'sent' | 'partial' | 'failed' | 'cancelled';
+  audience_source: 'crm_contacts' | 'users';
+  audience_filters?: {
+    client_id?: number | null;
+    country_id?: number | null;
+    state_id?: number | null;
+    city_id?: number | null;
+    role_id?: number | null;
+    only_active?: boolean;
+    only_primary?: boolean;
+  } | null;
+  from_name?: string | null;
+  from_email?: string | null;
+  reply_to_email?: string | null;
+  reply_to_name?: string | null;
+  subject_override?: string | null;
+  preheader_override?: string | null;
+  body_html_override?: string | null;
+  body_text_override?: string | null;
+  total_recipients?: number;
+  pending_count?: number;
+  sent_count?: number;
+  failed_count?: number;
+  skipped_count?: number;
+  scheduled_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  last_error?: string | null;
+  company?: Pick<Company, 'id' | 'name'> | null;
+  template?: Pick<CrmEmailTemplate, 'id' | 'name' | 'subject' | 'preheader'> | null;
+  creator?: Pick<User, 'id' | 'name'> | null;
+  updater?: Pick<User, 'id' | 'name'> | null;
+}
+
+export interface CrmEmailCampaignPayload {
+  company_id?: number | null;
+  template_id: number;
+  name: string;
+  status?: 'draft' | 'scheduled';
+  audience_source: 'crm_contacts' | 'users';
+  audience_filters?: {
+    client_id?: number | null;
+    country_id?: number | null;
+    state_id?: number | null;
+    city_id?: number | null;
+    role_id?: number | null;
+    only_active?: boolean;
+    only_primary?: boolean;
+  };
+  from_name?: string | null;
+  from_email?: string | null;
+  reply_to_email?: string | null;
+  reply_to_name?: string | null;
+  subject_override?: string | null;
+  preheader_override?: string | null;
+  body_html_override?: string | null;
+  body_text_override?: string | null;
+  scheduled_at?: string | null;
+}
+
+export interface CrmEmailCampaignRecipient {
+  id: number;
+  campaign_id: number;
+  company_id: number;
+  recipient_type: 'crm_contact' | 'user';
+  recipient_id?: number | null;
+  recipient_name?: string | null;
+  recipient_email: string;
+  status: 'pending' | 'processing' | 'sent' | 'failed' | 'skipped';
+  variables?: Record<string, string> | null;
+  provider_message_id?: string | null;
+  attempted_at?: string | null;
+  sent_at?: string | null;
+  last_error?: string | null;
+}
+
+export interface CrmEmailPreviewPayload {
+  company_id?: number | null;
+  template_id?: number | null;
+  client_id?: number | null;
+  subject?: string | null;
+  preheader?: string | null;
+  body_html?: string | null;
+  body_text?: string | null;
+  variables?: Record<string, string>;
+}
+
+export interface CrmEmailPreviewResponse {
+  subject: string;
+  preheader?: string | null;
+  body_html: string;
+  body_text: string;
+}

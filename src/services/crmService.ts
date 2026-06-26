@@ -1,6 +1,19 @@
 import api from '../lib/axios';
 import type { PaginatedResponse } from '../types/api';
-import type { CrmActivity, CrmActivityPayload, CrmCatalogItem, CrmContact, CrmContactPayload } from '../types/crm';
+import type {
+  CrmActivity,
+  CrmActivityPayload,
+  CrmCatalogItem,
+  CrmContact,
+  CrmContactPayload,
+  CrmEmailCampaign,
+  CrmEmailCampaignPayload,
+  CrmEmailCampaignRecipient,
+  CrmEmailPreviewPayload,
+  CrmEmailPreviewResponse,
+  CrmEmailTemplate,
+  CrmEmailTemplatePayload,
+} from '../types/crm';
 
 const unwrap = <T>(payload: any): T => payload?.data ?? payload;
 
@@ -92,5 +105,75 @@ export const crmService = {
 
   async deleteContact(id: number): Promise<void> {
     await api.delete(`/crm/contacts/${id}`);
+  },
+
+  async getMarketingTemplates(params?: Record<string, unknown>): Promise<PaginatedResponse<CrmEmailTemplate>> {
+    const response = await api.get('/crm/marketing/templates', { params });
+    return normalizePaginatedResponse<CrmEmailTemplate>(response.data);
+  },
+
+  async createMarketingTemplate(payload: CrmEmailTemplatePayload): Promise<CrmEmailTemplate> {
+    const response = await api.post('/crm/marketing/templates', payload);
+    return unwrap<CrmEmailTemplate>(response.data);
+  },
+
+  async getMarketingTemplate(id: number): Promise<CrmEmailTemplate> {
+    const response = await api.get(`/crm/marketing/templates/${id}`);
+    return unwrap<CrmEmailTemplate>(response.data);
+  },
+
+  async updateMarketingTemplate(id: number, payload: Partial<CrmEmailTemplatePayload>): Promise<CrmEmailTemplate> {
+    const response = await api.put(`/crm/marketing/templates/${id}`, payload);
+    return unwrap<CrmEmailTemplate>(response.data);
+  },
+
+  async deleteMarketingTemplate(id: number): Promise<void> {
+    await api.delete(`/crm/marketing/templates/${id}`);
+  },
+
+  async getMarketingCampaigns(params?: Record<string, unknown>): Promise<PaginatedResponse<CrmEmailCampaign>> {
+    const response = await api.get('/crm/marketing/campaigns', { params });
+    return normalizePaginatedResponse<CrmEmailCampaign>(response.data);
+  },
+
+  async createMarketingCampaign(payload: CrmEmailCampaignPayload): Promise<CrmEmailCampaign> {
+    const response = await api.post('/crm/marketing/campaigns', payload);
+    return unwrap<CrmEmailCampaign>(response.data);
+  },
+
+  async getMarketingCampaign(id: number): Promise<CrmEmailCampaign> {
+    const response = await api.get(`/crm/marketing/campaigns/${id}`);
+    return unwrap<CrmEmailCampaign>(response.data);
+  },
+
+  async updateMarketingCampaign(id: number, payload: Partial<CrmEmailCampaignPayload>): Promise<CrmEmailCampaign> {
+    const response = await api.put(`/crm/marketing/campaigns/${id}`, payload);
+    return unwrap<CrmEmailCampaign>(response.data);
+  },
+
+  async deleteMarketingCampaign(id: number): Promise<void> {
+    await api.delete(`/crm/marketing/campaigns/${id}`);
+  },
+
+  async launchMarketingCampaign(id: number): Promise<void> {
+    await api.post(`/crm/marketing/campaigns/${id}/launch`);
+  },
+
+  async sendMarketingCampaignNow(id: number): Promise<void> {
+    await api.post(`/crm/marketing/campaigns/${id}/send-now`);
+  },
+
+  async cancelMarketingCampaign(id: number): Promise<void> {
+    await api.post(`/crm/marketing/campaigns/${id}/cancel`);
+  },
+
+  async getMarketingCampaignRecipients(id: number, params?: Record<string, unknown>): Promise<PaginatedResponse<CrmEmailCampaignRecipient>> {
+    const response = await api.get(`/crm/marketing/campaigns/${id}/recipients`, { params });
+    return normalizePaginatedResponse<CrmEmailCampaignRecipient>(response.data);
+  },
+
+  async previewMarketingEmail(payload: CrmEmailPreviewPayload): Promise<CrmEmailPreviewResponse> {
+    const response = await api.post('/crm/marketing/preview', payload);
+    return unwrap<CrmEmailPreviewResponse>(response.data);
   },
 };

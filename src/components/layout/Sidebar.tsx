@@ -13,7 +13,20 @@ const Sidebar: React.FC = () => {
     const { user, logout, hasPermission } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
-    const canSeeCrmMenu = hasPermission('crm.activities.list') || hasPermission('crm.whatsapp.inbox');
+    const marketingPermissions = [
+        'crm.marketing.list',
+        'crm.marketing.templates.list',
+        'crm.marketing.templates.create',
+        'crm.marketing.templates.update',
+        'crm.marketing.templates.delete',
+        'crm.marketing.campaigns.list',
+        'crm.marketing.campaigns.create',
+        'crm.marketing.campaigns.update',
+        'crm.marketing.campaigns.delete',
+        'crm.marketing.campaigns.send',
+    ];
+    const canSeeMarketingMenu = marketingPermissions.some((permission) => hasPermission(permission));
+    const canSeeCrmMenu = hasPermission('crm.activities.list') || hasPermission('crm.whatsapp.inbox') || canSeeMarketingMenu;
 
     const toggleMenu = (key: string, level: number) => {
         setOpenMenuByLevel((prev) => {
@@ -66,6 +79,13 @@ const Sidebar: React.FC = () => {
                 { name: 'Resumen CRM', path: '/crm', permission: 'crm.activities.list', exact: true },
                 { name: 'Gestiones', path: '/crm/gestiones', permission: 'crm.activities.list', exact: true },
                 { name: 'Inbox WhatsApp', path: '/crm/whatsapp', permission: 'crm.whatsapp.inbox', exact: true },
+                {
+                    name: 'Marketing Email',
+                    path: '/crm/marketing',
+                    permission: 'crm.marketing.list',
+                    permissionAny: marketingPermissions,
+                    exact: true
+                },
             ]
         },
         {
@@ -146,7 +166,7 @@ const Sidebar: React.FC = () => {
                 }
 
                 return (
-                    <PermissionGuard key={item.name} permission={item.permission}>
+                    <PermissionGuard key={item.name} permission={item.permission} permissionAny={item.permissionAny}>
                         {itemContent}
                     </PermissionGuard>
                 );

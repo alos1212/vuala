@@ -36,9 +36,25 @@ import ClientFormPage from "../pages/clients/ClientFormPage"
 import CrmDashboardPage from "../pages/crm/CrmDashboardPage"
 import CrmTasksPage from "../pages/crm/CrmTasksPage"
 import CrmActivityFormPage from "../pages/crm/CrmActivityFormPage"
+import CrmMarketingPage from "../pages/crm/CrmMarketingPage"
+import CrmMarketingTemplateFormPage from "../pages/crm/CrmMarketingTemplateFormPage"
+import CrmMarketingCampaignFormPage from "../pages/crm/CrmMarketingCampaignFormPage"
 import CrmWhatsappInboxPage from "../pages/crm/CrmWhatsappInboxPage"
 import CrmContactsPage from "../pages/crm/CrmContactsPage"
 import CrmContactDetailPage from "../pages/crm/CrmContactDetailPage"
+
+const crmMarketingPermissions = [
+    "crm.marketing.list",
+    "crm.marketing.templates.list",
+    "crm.marketing.templates.create",
+    "crm.marketing.templates.update",
+    "crm.marketing.templates.delete",
+    "crm.marketing.campaigns.list",
+    "crm.marketing.campaigns.create",
+    "crm.marketing.campaigns.update",
+    "crm.marketing.campaigns.delete",
+    "crm.marketing.campaigns.send",
+]
 
 const AppRouter: React.FC = () => {
     const { isAuthenticated } = useAuthStore()
@@ -235,6 +251,46 @@ const AppRouter: React.FC = () => {
                                 element={
                                     <ProtectedRoute permission="crm.activities.update">
                                         <CrmActivityFormPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="crm/marketing"
+                                element={
+                                    <ProtectedRoute permissionAny={crmMarketingPermissions}>
+                                        <CrmMarketingPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="crm/marketing/plantillas/nueva"
+                                element={
+                                    <ProtectedRoute permissionAny={crmMarketingPermissions}>
+                                        <CrmMarketingTemplateFormPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="crm/marketing/plantillas/:id/editar"
+                                element={
+                                    <ProtectedRoute permissionAny={crmMarketingPermissions}>
+                                        <CrmMarketingTemplateFormPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="crm/marketing/campanas/nueva"
+                                element={
+                                    <ProtectedRoute permissionAny={crmMarketingPermissions}>
+                                        <CrmMarketingCampaignFormPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="crm/marketing/campanas/:id/editar"
+                                element={
+                                    <ProtectedRoute permissionAny={crmMarketingPermissions}>
+                                        <CrmMarketingCampaignFormPage />
                                     </ProtectedRoute>
                                 }
                             />
