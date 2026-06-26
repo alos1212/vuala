@@ -18,6 +18,8 @@ export const getEmptyCampaignForm = (companyId?: number | null): CrmEmailCampaig
   status: 'draft',
   audience_source: 'crm_contacts',
   audience_filters: {
+    company_ids: companyId ? [companyId] : [],
+    contact_ids: [],
     only_active: true,
     only_primary: false,
     client_id: null,

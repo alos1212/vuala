@@ -33,6 +33,7 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
   const [scheduledTime, setScheduledTime] = useState('09:00');
   const [isSaving, setIsSaving] = useState(false);
+  const [contactSearch, setContactSearch] = useState('');
 
   const { data: campaignData } = useQuery({
     queryKey: ['crm-marketing-campaign', campaignId],
@@ -54,6 +55,8 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
       status: campaign.status === 'scheduled' ? 'scheduled' : 'draft',
       audience_source: campaign.audience_source,
       audience_filters: {
+        company_ids: campaign.audience_filters?.company_ids ?? [],
+        contact_ids: campaign.audience_filters?.contact_ids ?? [],
         client_id: campaign.audience_filters?.client_id ?? null,
         country_id: campaign.audience_filters?.country_id ?? null,
         state_id: campaign.audience_filters?.state_id ?? null,
@@ -100,7 +103,9 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
   const { data: audiencePreviewData, isLoading: isLoadingAudiencePreview } = useQuery({
     queryKey: ['crm-marketing-audience-preview', companyId, campaignForm.audience_source, campaignForm.audience_filters],
     queryFn: () => crmService.getContacts({
-      company_id: companyId ?? undefined,
+      company_ids: campaignForm.audience_filters?.company_ids?.length ? campaignForm.audience_filters.company_ids : undefined,
+      company_id: campaignForm.audience_filters?.company_ids?.length ? undefined : (companyId ?? undefined),
+      contact_ids: campaignForm.audience_filters?.contact_ids?.length ? campaignForm.audience_filters.contact_ids : undefined,
       client_id: campaignForm.audience_filters?.client_id ?? undefined,
       country_id: campaignForm.audience_filters?.country_id ?? undefined,
       state_id: campaignForm.audience_filters?.state_id ?? undefined,
@@ -108,6 +113,17 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
       is_active: campaignForm.audience_filters?.only_active ?? undefined,
       is_primary: campaignForm.audience_filters?.only_primary ?? undefined,
       per_page: 200,
+    }),
+    enabled: campaignForm.audience_source === 'crm_contacts' && Boolean(companyId),
+  });
+
+  const { data: searchableContactsData, isLoading: isLoadingSearchableContacts } = useQuery({
+    queryKey: ['crm-marketing-searchable-contacts', companyId, campaignForm.audience_filters?.company_ids, contactSearch],
+    queryFn: () => crmService.getContacts({
+      company_ids: campaignForm.audience_filters?.company_ids?.length ? campaignForm.audience_filters.company_ids : undefined,
+      company_id: campaignForm.audience_filters?.company_ids?.length ? undefined : (companyId ?? undefined),
+      search: contactSearch || undefined,
+      per_page: 50,
     }),
     enabled: campaignForm.audience_source === 'crm_contacts' && Boolean(companyId),
   });
@@ -140,6 +156,19 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
   const templateOptions = templates.map((template) => ({ value: template.id, label: template.name }));
   const clientOptions = clients.map((client) => ({ value: client.id, label: client.name }));
   const roleOptions = (rolesData ?? []).filter((role) => role.type === 1 || role.type === 0).map((role) => ({ value: role.id, label: role.display_name }));
+  const searchableContacts = searchableContactsData?.data ?? [];
+  const selectedContactIds = campaignForm.audience_filters?.contact_ids ?? [];
+  const selectedContactOptions = audiencePreviewContacts
+    .filter((contact) => selectedContactIds.includes(contact.id))
+    .map((contact) => ({
+      value: contact.id,
+      label: `${contact.name}${contact.email ? ` · ${contact.email}` : ''}`,
+    }));
+  const searchedContactOptions = searchableContacts.map((contact) => ({
+    value: contact.id,
+    label: `${contact.name}${contact.email ? ` · ${contact.email}` : ''}`,
+  }));
+  const contactOptions = Array.from(new Map([...selectedContactOptions, ...searchedContactOptions].map((option) => [option.value, option])).values());
 
   const handleSave = async () => {
     if (!campaignForm.name.trim() || !campaignForm.template_id) {
@@ -166,6 +195,8 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
         scheduled_at: scheduledAt || null,
         audience_filters: {
           ...campaignForm.audience_filters,
+          company_ids: campaignForm.audience_filters?.company_ids ?? [],
+          contact_ids: campaignForm.audience_filters?.contact_ids ?? [],
           client_id: campaignForm.audience_filters?.client_id || null,
           country_id: campaignForm.audience_filters?.country_id || null,
           state_id: campaignForm.audience_filters?.state_id || null,
@@ -226,6 +257,8 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
                     company_id: value ? Number(value) : null,
                     audience_filters: {
                       ...current.audience_filters,
+                      company_ids: value ? [Number(value)] : [],
+                      contact_ids: [],
                       client_id: null,
                     },
                   }))}
@@ -301,6 +334,8 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
                 ...current,
                 audience_source: event.target.value as 'crm_contacts' | 'users',
                 audience_filters: {
+                  company_ids: current.audience_filters?.company_ids ?? (companyId ? [companyId] : []),
+                  contact_ids: [],
                   only_active: current.audience_filters?.only_active ?? true,
                   only_primary: false,
                   client_id: null,
@@ -326,6 +361,45 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
             </label>
             {campaignForm.audience_source === 'crm_contacts' ? (
               <>
+                {isGlobalUser && (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Empresas objetivo</label>
+                    <SearchableSelect
+                      options={companyOptions}
+                      value={campaignForm.audience_filters?.company_ids ?? []}
+                      onChange={(value) => setCampaignForm((current) => ({
+                        ...current,
+                        audience_filters: {
+                          ...current.audience_filters,
+                          company_ids: Array.isArray(value) ? value.map((entry) => Number(entry)) : [],
+                          contact_ids: [],
+                          client_id: null,
+                        },
+                      }))}
+                      placeholder="Selecciona una o varias empresas"
+                      isMulti
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="mb-2 block text-sm font-medium">Contactos específicos</label>
+                  <SearchableSelect
+                    options={contactOptions}
+                    value={campaignForm.audience_filters?.contact_ids ?? []}
+                    onChange={(value) => setCampaignForm((current) => ({
+                      ...current,
+                      audience_filters: {
+                        ...current.audience_filters,
+                        contact_ids: Array.isArray(value) ? value.map((entry) => Number(entry)) : [],
+                      },
+                    }))}
+                    placeholder="Busca y agrega contactos concretos"
+                    isMulti
+                    inputValue={contactSearch}
+                    onInputChange={setContactSearch}
+                    isLoading={isLoadingSearchableContacts}
+                  />
+                </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium">Cliente</label>
                   <SearchableSelect

@@ -87,7 +87,9 @@ const CrmMarketingPage: React.FC = () => {
   const { data: selectedCampaignAudiencePreview, isLoading: isLoadingSelectedCampaignAudiencePreview } = useQuery({
     queryKey: ['crm-marketing-selected-campaign-audience', selectedCampaignId, selectedCampaign?.company_id, selectedCampaign?.audience_filters],
     queryFn: () => crmService.getContacts({
-      company_id: selectedCampaign?.company_id,
+      company_ids: selectedCampaign?.audience_filters?.company_ids?.length ? selectedCampaign.audience_filters.company_ids : undefined,
+      company_id: selectedCampaign?.audience_filters?.company_ids?.length ? undefined : selectedCampaign?.company_id,
+      contact_ids: selectedCampaign?.audience_filters?.contact_ids?.length ? selectedCampaign.audience_filters.contact_ids : undefined,
       client_id: selectedCampaign?.audience_filters?.client_id ?? undefined,
       country_id: selectedCampaign?.audience_filters?.country_id ?? undefined,
       state_id: selectedCampaign?.audience_filters?.state_id ?? undefined,

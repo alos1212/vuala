@@ -8,14 +8,15 @@ export interface SearchableSelectOption {
 
 interface SearchableSelectProps {
   options: SearchableSelectOption[];
-  value?: string | number | null;
-  onChange: (value: string | number | null) => void;
+  value?: string | number | Array<string | number> | null;
+  onChange: (value: string | number | Array<string | number> | null) => void;
   placeholder?: string;
   isDisabled?: boolean;
   isClearable?: boolean;
   inputValue?: string;
   onInputChange?: (value: string) => void;
   isLoading?: boolean;
+  isMulti?: boolean;
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -28,18 +29,31 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   inputValue,
   onInputChange,
   isLoading = false,
+  isMulti = false,
 }) => {
-  const selectedOption = options.find((option) => option.value === value) ?? null;
+  const selectedOption = isMulti
+    ? options.filter((option) => Array.isArray(value) && value.includes(option.value))
+    : options.find((option) => option.value === value) ?? null;
 
   return (
     <Select
       options={options}
       value={selectedOption}
-      onChange={(option) => onChange(option?.value ?? null)}
+      onChange={(option) => {
+        if (isMulti) {
+          const selected = Array.isArray(option) ? option.map((entry) => entry.value) : [];
+          onChange(selected);
+
+          return;
+        }
+
+        onChange((option as SearchableSelectOption | null)?.value ?? null);
+      }}
       placeholder={placeholder}
       isDisabled={isDisabled}
       isClearable={isClearable}
       isSearchable
+      isMulti={isMulti}
       inputValue={inputValue}
       onInputChange={(nextValue, meta) => {
         if (!onInputChange) return;
