@@ -87,15 +87,17 @@ const CrmMarketingPage: React.FC = () => {
   const { data: selectedCampaignAudiencePreview, isLoading: isLoadingSelectedCampaignAudiencePreview } = useQuery({
     queryKey: ['crm-marketing-selected-campaign-audience', selectedCampaignId, selectedCampaign?.company_id, selectedCampaign?.audience_filters],
     queryFn: () => crmService.getContacts({
-      company_ids: selectedCampaign?.audience_filters?.company_ids?.length ? selectedCampaign.audience_filters.company_ids : undefined,
-      company_id: selectedCampaign?.audience_filters?.company_ids?.length ? undefined : selectedCampaign?.company_id,
+      company_id: selectedCampaign?.company_id,
       contact_ids: selectedCampaign?.audience_filters?.contact_ids?.length ? selectedCampaign.audience_filters.contact_ids : undefined,
-      client_id: selectedCampaign?.audience_filters?.client_id ?? undefined,
+      client_id: selectedCampaign?.audience_filters?.client_ids?.length === 1
+        ? selectedCampaign.audience_filters.client_ids[0]
+        : selectedCampaign?.audience_filters?.client_id ?? undefined,
+      client_ids: selectedCampaign?.audience_filters?.client_ids?.length ? selectedCampaign.audience_filters.client_ids : undefined,
+      excluded_contact_ids: selectedCampaign?.audience_filters?.excluded_contact_ids?.length ? selectedCampaign.audience_filters.excluded_contact_ids : undefined,
       country_id: selectedCampaign?.audience_filters?.country_id ?? undefined,
       state_id: selectedCampaign?.audience_filters?.state_id ?? undefined,
       city_id: selectedCampaign?.audience_filters?.city_id ?? undefined,
       is_active: selectedCampaign?.audience_filters?.only_active ?? undefined,
-      is_primary: selectedCampaign?.audience_filters?.only_primary ?? undefined,
       per_page: 200,
     }),
     enabled: Boolean(selectedCampaign) && selectedCampaign?.audience_source === 'crm_contacts',

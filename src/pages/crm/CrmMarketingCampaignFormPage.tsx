@@ -55,7 +55,7 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
       status: campaign.status === 'scheduled' ? 'scheduled' : 'draft',
       audience_source: campaign.audience_source,
       audience_filters: {
-        company_ids: campaign.audience_filters?.company_ids ?? [],
+        client_ids: campaign.audience_filters?.client_ids ?? [],
         contact_ids: campaign.audience_filters?.contact_ids ?? [],
         client_id: campaign.audience_filters?.client_id ?? null,
         country_id: campaign.audience_filters?.country_id ?? null,
@@ -63,7 +63,6 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
         city_id: campaign.audience_filters?.city_id ?? null,
         role_id: campaign.audience_filters?.role_id ?? null,
         only_active: campaign.audience_filters?.only_active ?? true,
-        only_primary: campaign.audience_filters?.only_primary ?? false,
       },
       reply_to_email: campaign.reply_to_email ?? '',
       reply_to_name: campaign.reply_to_name ?? '',
@@ -103,25 +102,30 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
   const { data: audiencePreviewData, isLoading: isLoadingAudiencePreview } = useQuery({
     queryKey: ['crm-marketing-audience-preview', companyId, campaignForm.audience_source, campaignForm.audience_filters],
     queryFn: () => crmService.getContacts({
-      company_ids: campaignForm.audience_filters?.company_ids?.length ? campaignForm.audience_filters.company_ids : undefined,
-      company_id: campaignForm.audience_filters?.company_ids?.length ? undefined : (companyId ?? undefined),
+      company_id: companyId ?? undefined,
       contact_ids: campaignForm.audience_filters?.contact_ids?.length ? campaignForm.audience_filters.contact_ids : undefined,
-      client_id: campaignForm.audience_filters?.client_id ?? undefined,
+      client_id: campaignForm.audience_filters?.client_ids?.length === 1
+        ? campaignForm.audience_filters.client_ids[0]
+        : campaignForm.audience_filters?.client_id ?? undefined,
+      client_ids: campaignForm.audience_filters?.client_ids?.length ? campaignForm.audience_filters.client_ids : undefined,
+      excluded_contact_ids: campaignForm.audience_filters?.excluded_contact_ids?.length ? campaignForm.audience_filters.excluded_contact_ids : undefined,
       country_id: campaignForm.audience_filters?.country_id ?? undefined,
       state_id: campaignForm.audience_filters?.state_id ?? undefined,
       city_id: campaignForm.audience_filters?.city_id ?? undefined,
       is_active: campaignForm.audience_filters?.only_active ?? undefined,
-      is_primary: campaignForm.audience_filters?.only_primary ?? undefined,
       per_page: 200,
     }),
     enabled: campaignForm.audience_source === 'crm_contacts' && Boolean(companyId),
   });
 
   const { data: searchableContactsData, isLoading: isLoadingSearchableContacts } = useQuery({
-    queryKey: ['crm-marketing-searchable-contacts', companyId, campaignForm.audience_filters?.company_ids, contactSearch],
+    queryKey: ['crm-marketing-searchable-contacts', companyId, campaignForm.audience_filters?.client_ids, contactSearch],
     queryFn: () => crmService.getContacts({
-      company_ids: campaignForm.audience_filters?.company_ids?.length ? campaignForm.audience_filters.company_ids : undefined,
-      company_id: campaignForm.audience_filters?.company_ids?.length ? undefined : (companyId ?? undefined),
+      company_id: companyId ?? undefined,
+      client_id: campaignForm.audience_filters?.client_ids?.length === 1
+        ? campaignForm.audience_filters.client_ids[0]
+        : campaignForm.audience_filters?.client_id ?? undefined,
+      client_ids: campaignForm.audience_filters?.client_ids?.length ? campaignForm.audience_filters.client_ids : undefined,
       search: contactSearch || undefined,
       per_page: 50,
     }),
@@ -195,7 +199,7 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
         scheduled_at: scheduledAt || null,
         audience_filters: {
           ...campaignForm.audience_filters,
-          company_ids: campaignForm.audience_filters?.company_ids ?? [],
+          client_ids: campaignForm.audience_filters?.client_ids ?? [],
           contact_ids: campaignForm.audience_filters?.contact_ids ?? [],
           client_id: campaignForm.audience_filters?.client_id || null,
           country_id: campaignForm.audience_filters?.country_id || null,
@@ -257,7 +261,7 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
                     company_id: value ? Number(value) : null,
                     audience_filters: {
                       ...current.audience_filters,
-                      company_ids: value ? [Number(value)] : [],
+                      client_ids: [],
                       contact_ids: [],
                       client_id: null,
                     },
@@ -334,10 +338,9 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
                 ...current,
                 audience_source: event.target.value as 'crm_contacts' | 'users',
                 audience_filters: {
-                  company_ids: current.audience_filters?.company_ids ?? (companyId ? [companyId] : []),
+                  client_ids: current.audience_filters?.client_ids ?? [],
                   contact_ids: [],
                   only_active: current.audience_filters?.only_active ?? true,
-                  only_primary: false,
                   client_id: null,
                   country_id: null,
                   state_id: null,
@@ -361,114 +364,136 @@ const CrmMarketingCampaignFormPage: React.FC = () => {
             </label>
             {campaignForm.audience_source === 'crm_contacts' ? (
               <>
-                {isGlobalUser && (
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">Empresas objetivo</label>
-                    <SearchableSelect
-                      options={companyOptions}
-                      value={campaignForm.audience_filters?.company_ids ?? []}
-                      onChange={(value) => setCampaignForm((current) => ({
+                <div>
+                  <label className="mb-2 block text-sm font-medium">Segmentar por</label>
+                  <select
+                    className="select select-bordered w-full"
+                    value={campaignForm.audience_filters?.segment_by ?? 'clients'}
+                    onChange={(event) => setCampaignForm((current) => ({
+                      ...current,
+                      audience_filters: {
+                        ...current.audience_filters,
+                        segment_by: event.target.value as 'clients' | 'zone',
+                        client_ids: [],
+                        client_id: null,
+                        country_id: null,
+                        state_id: null,
+                        city_id: null,
+                        contact_ids: [],
+                        excluded_contact_ids: [],
+                      },
+                    }))}
+                  >
+                    <option value="clients">Clientes</option>
+                    <option value="zone">Zona</option>
+                  </select>
+                </div>
+                {(campaignForm.audience_filters?.segment_by ?? 'clients') === 'clients' ? (
+                  <>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium">Clientes objetivo</label>
+                      <SearchableSelect
+                        options={clientOptions}
+                        value={campaignForm.audience_filters?.client_ids ?? []}
+                        onChange={(value) => setCampaignForm((current) => ({
+                          ...current,
+                          audience_filters: {
+                            ...current.audience_filters,
+                            client_ids: Array.isArray(value) ? value.map((entry) => Number(entry)) : [],
+                            client_id: null,
+                            contact_ids: [],
+                            excluded_contact_ids: [],
+                          },
+                        }))}
+                        placeholder="Selecciona uno o varios clientes"
+                        isMulti
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium">Contactos específicos</label>
+                      <SearchableSelect
+                        options={contactOptions}
+                        value={campaignForm.audience_filters?.contact_ids ?? []}
+                        onChange={(value) => setCampaignForm((current) => ({
+                          ...current,
+                          audience_filters: {
+                            ...current.audience_filters,
+                            contact_ids: Array.isArray(value) ? value.map((entry) => Number(entry)) : [],
+                          },
+                        }))}
+                        placeholder="Busca y agrega contactos concretos"
+                        isMulti
+                        inputValue={contactSearch}
+                        onInputChange={setContactSearch}
+                        isLoading={isLoadingSearchableContacts}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium">País</label>
+                      <select className="select select-bordered w-full" value={campaignForm.audience_filters?.country_id ?? ''} onChange={(event) => setCampaignForm((current) => ({
                         ...current,
                         audience_filters: {
                           ...current.audience_filters,
-                          company_ids: Array.isArray(value) ? value.map((entry) => Number(entry)) : [],
-                          contact_ids: [],
-                          client_id: null,
+                          country_id: event.target.value ? Number(event.target.value) : null,
+                          state_id: null,
+                          city_id: null,
                         },
-                      }))}
-                      placeholder="Selecciona una o varias empresas"
-                      isMulti
-                    />
+                      }))}>
+                        <option value="">Todos</option>
+                        {(countries ?? []).map((country) => <option key={country.id} value={country.id}>{country.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium">Estado</label>
+                      <select className="select select-bordered w-full" value={campaignForm.audience_filters?.state_id ?? ''} onChange={(event) => setCampaignForm((current) => ({
+                        ...current,
+                        audience_filters: {
+                          ...current.audience_filters,
+                          state_id: event.target.value ? Number(event.target.value) : null,
+                          city_id: null,
+                        },
+                      }))} disabled={!selectedCountryId}>
+                        <option value="">Todos</option>
+                        {(states ?? []).map((state) => <option key={state.id} value={state.id}>{state.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium">Ciudad</label>
+                      <select className="select select-bordered w-full" value={campaignForm.audience_filters?.city_id ?? ''} onChange={(event) => setCampaignForm((current) => ({
+                        ...current,
+                        audience_filters: {
+                          ...current.audience_filters,
+                          city_id: event.target.value ? Number(event.target.value) : null,
+                        },
+                      }))} disabled={!selectedStateId}>
+                        <option value="">Todas</option>
+                        {(cities ?? []).map((city) => <option key={city.id} value={city.id}>{city.name}</option>)}
+                      </select>
+                    </div>
                   </div>
                 )}
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Contactos específicos</label>
+                  <label className="mb-2 block text-sm font-medium">Excluir contactos</label>
                   <SearchableSelect
                     options={contactOptions}
-                    value={campaignForm.audience_filters?.contact_ids ?? []}
+                    value={campaignForm.audience_filters?.excluded_contact_ids ?? []}
                     onChange={(value) => setCampaignForm((current) => ({
                       ...current,
                       audience_filters: {
                         ...current.audience_filters,
-                        contact_ids: Array.isArray(value) ? value.map((entry) => Number(entry)) : [],
+                        excluded_contact_ids: Array.isArray(value) ? value.map((entry) => Number(entry)) : [],
                       },
                     }))}
-                    placeholder="Busca y agrega contactos concretos"
+                    placeholder="Quita contactos que no quieras incluir"
                     isMulti
                     inputValue={contactSearch}
                     onInputChange={setContactSearch}
                     isLoading={isLoadingSearchableContacts}
                   />
                 </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium">Cliente</label>
-                  <SearchableSelect
-                    options={clientOptions}
-                    value={campaignForm.audience_filters?.client_id ?? null}
-                    onChange={(value) => setCampaignForm((current) => ({
-                      ...current,
-                      audience_filters: {
-                        ...current.audience_filters,
-                        client_id: value ? Number(value) : null,
-                      },
-                    }))}
-                    placeholder="Todos los clientes"
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">País</label>
-                    <select className="select select-bordered w-full" value={campaignForm.audience_filters?.country_id ?? ''} onChange={(event) => setCampaignForm((current) => ({
-                      ...current,
-                      audience_filters: {
-                        ...current.audience_filters,
-                        country_id: event.target.value ? Number(event.target.value) : null,
-                        state_id: null,
-                        city_id: null,
-                      },
-                    }))}>
-                      <option value="">Todos</option>
-                      {(countries ?? []).map((country) => <option key={country.id} value={country.id}>{country.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">Estado</label>
-                    <select className="select select-bordered w-full" value={campaignForm.audience_filters?.state_id ?? ''} onChange={(event) => setCampaignForm((current) => ({
-                      ...current,
-                      audience_filters: {
-                        ...current.audience_filters,
-                        state_id: event.target.value ? Number(event.target.value) : null,
-                        city_id: null,
-                      },
-                    }))} disabled={!selectedCountryId}>
-                      <option value="">Todos</option>
-                      {(states ?? []).map((state) => <option key={state.id} value={state.id}>{state.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">Ciudad</label>
-                    <select className="select select-bordered w-full" value={campaignForm.audience_filters?.city_id ?? ''} onChange={(event) => setCampaignForm((current) => ({
-                      ...current,
-                      audience_filters: {
-                        ...current.audience_filters,
-                        city_id: event.target.value ? Number(event.target.value) : null,
-                      },
-                    }))} disabled={!selectedStateId}>
-                      <option value="">Todas</option>
-                      {(cities ?? []).map((city) => <option key={city.id} value={city.id}>{city.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <label className="flex items-center gap-2 rounded-2xl border border-base-200 px-3 py-2">
-                  <input type="checkbox" className="checkbox checkbox-sm" checked={campaignForm.audience_filters?.only_primary ?? false} onChange={(event) => setCampaignForm((current) => ({
-                    ...current,
-                    audience_filters: {
-                      ...current.audience_filters,
-                      only_primary: event.target.checked,
-                    },
-                  }))} />
-                  <span className="text-sm">Solo contactos principales</span>
-                </label>
               </>
             ) : (
               <div>

@@ -141,15 +141,16 @@ export interface CrmEmailCampaign {
   status: 'draft' | 'scheduled' | 'processing' | 'sent' | 'partial' | 'failed' | 'cancelled';
   audience_source: 'crm_contacts' | 'users';
   audience_filters?: {
-    company_ids?: number[];
+    segment_by?: 'clients' | 'zone';
+    client_ids?: number[];
     contact_ids?: number[];
+    excluded_contact_ids?: number[];
     client_id?: number | null;
     country_id?: number | null;
     state_id?: number | null;
     city_id?: number | null;
     role_id?: number | null;
     only_active?: boolean;
-    only_primary?: boolean;
   } | null;
   reply_to_email?: string | null;
   reply_to_name?: string | null;
@@ -179,15 +180,16 @@ export interface CrmEmailCampaignPayload {
   status?: 'draft' | 'scheduled';
   audience_source: 'crm_contacts' | 'users';
   audience_filters?: {
-    company_ids?: number[];
+    segment_by?: 'clients' | 'zone';
+    client_ids?: number[];
     contact_ids?: number[];
+    excluded_contact_ids?: number[];
     client_id?: number | null;
     country_id?: number | null;
     state_id?: number | null;
     city_id?: number | null;
     role_id?: number | null;
     only_active?: boolean;
-    only_primary?: boolean;
   };
   reply_to_email?: string | null;
   reply_to_name?: string | null;
